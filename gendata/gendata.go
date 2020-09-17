@@ -51,7 +51,7 @@ func (z *ZzConfig) genDdls() ([]*tableStmt, []*fieldExec, error) {
 	}
 
 	for _, tableStmt := range tableStmts {
-		tableStmt.wrapInTable(fieldStmts)
+		tableStmt.wrapInTable(fieldStmts, fieldExecs)
 	}
 
 	return tableStmts, fieldExecs, nil

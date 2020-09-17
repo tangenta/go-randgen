@@ -188,3 +188,19 @@ func (u *unsignGen) Gen() string {
 
 	return u.defaul
 }
+
+type notNullGen struct {
+	gen generators.Generator
+	retryNum int
+	defaul string
+}
+
+func (n *notNullGen) Gen() string {
+	for i := 0; i < n.retryNum; i++ {
+		cur := n.gen.Gen()
+		if !strings.EqualFold(cur, "null") {
+			return cur
+		}
+	}
+	return n.defaul
+}

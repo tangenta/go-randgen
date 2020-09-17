@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yuin/gopher-lua"
+	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Tables struct {
@@ -13,7 +15,8 @@ type Tables struct {
 }
 
 var tablesTmpl = mustParse("tables", "create table {{.tname}} (\n" +
-"`pk` int primary key%s\n" +
+"`pk` int%s\n" +
+"{{.pk_counts}}\n" +
 ") {{.charsets}} {{.partitions}}")
 
 // support vars
@@ -29,6 +32,10 @@ var tablesVars = []*varWithDefault{
 	{
 		"partitions",
 		[]string{"undef"},
+	},
+	{
+		"pk_counts",
+		[]string{"1"},
 	},
 }
 
@@ -58,6 +65,17 @@ var tableFuncs = map[string]func(string, *tableStmt) (string, error){
 			return "", err
 		}
 		return fmt.Sprintf("\npartition by hash(pk)\npartitions %d", num), nil
+	},
+	"pk_counts": func(text string, stmt *tableStmt) (string, error) {
+		if text == "undef" {
+			text = "1"
+		}
+		num, err := strconv.Atoi(text)
+		if err != nil {
+			return "", err
+		}
+		stmt.primaryKeyCount = num
+		return "primary key(%s)", nil
 	},
 }
 
@@ -122,11 +140,35 @@ type tableStmt struct {
 	rowNum int
 	// generate by wrapInTable
 	ddl string
+	// column number contained in the primary key
+	primaryKeyCount int
 }
 
-func (t *tableStmt) wrapInTable(fieldStmts []string) {
+func (t *tableStmt) wrapInTable(fieldStmts []string, fieldExecs []*fieldExec) {
 	buf := &bytes.Buffer{}
 	buf.WriteString(",\n")
 	buf.WriteString(strings.Join(fieldStmts, ",\n"))
-	t.ddl = fmt.Sprintf(t.format, buf.String())
+	t.ddl = fmt.Sprintf(t.format, buf.String(), randomFieldNames(t.primaryKeyCount, fieldExecs))
+}
+
+func randomFieldNames(cnt int, fieldExecs []*fieldExec) string {
+	names := make([]string, len(fieldExecs))
+	for i := range fieldExecs {
+		names[i] = fieldExecs[i].name
+	}
+	shuffle(names)
+	if cnt > len(names) {
+		cnt = len(names)
+	}
+	return strings.Join(names[:cnt], ", ")
+}
+
+func shuffle(vals []string) {
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	for len(vals) > 0 {
+		n := len(vals)
+		randIndex := r.Intn(n)
+		vals[n-1], vals[randIndex] = vals[randIndex], vals[n-1]
+		vals = vals[:n-1]
+	}
 }

@@ -103,10 +103,15 @@ func (f *Fields) gen() ([]string, []*fieldExec, error) {
 	extraStmts := make([]string, 0)
 	fieldExecs := make([]*fieldExec, 0, f.numbers)
 
+	var names []string
 	err := f.traverse(func(cur []string) error {
 		fExec := &fieldExec{}
 
-		fname := fnamePrefix + "_" + strings.Join(cur, "_")
+		names = names[:0]
+		for i := range cur {
+			names = append(names, escapeFieldName(cur[i]))
+		}
+		fname := fnamePrefix + "_" + strings.Join(names, "_")
 		extraNum := 0
 
 		for i := range cur {
@@ -149,12 +154,21 @@ func (f *Fields) gen() ([]string, []*fieldExec, error) {
 	return stmts, fieldExecs, nil
 }
 
+func escapeFieldName(field string) string {
+	specialCh := []string{"(", ")", " ", ","}
+	for _, ch := range specialCh {
+		field = strings.ReplaceAll(field, ch, "_")
+	}
+	return field
+}
+
 type fieldExec struct {
 	canUnSign bool
 	unsign    bool
 	name      string
 	// tp writen by user zz file
 	tp string
+	isNotNull bool
 }
 
 func (f *fieldExec) dType() string {
