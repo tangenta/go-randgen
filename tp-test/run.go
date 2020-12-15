@@ -304,5 +304,20 @@ func doStmt(ctx context.Context, tx *sql.Tx, stmt Stmt) (*resultset.ResultSet, e
 }
 
 func validateErrs(err1 error, err2 error) bool {
+	if ignoreIndexCoverError(err1, err2) || ignoreSystemVariable(err1, err2) {
+		return true
+	}
 	return (err1 == nil && err2 == nil) || (err1 != nil && err2 != nil)
+}
+
+func ignoreIndexCoverError(err1, err2 error) bool {
+	c1 := err1 != nil && strings.Contains(err1.Error(), "with index covered now") && err2 == nil
+	c2 := err2 != nil && strings.Contains(err2.Error(), "with index covered now") && err1 == nil
+	return c1 || c2
+}
+
+func ignoreSystemVariable(err1, err2 error) bool {
+	c1 := err1 != nil && strings.Contains(err1.Error(), "Unknown system variable") && err2 == nil
+	c2 := err2 != nil && strings.Contains(err2.Error(), "Unknown system variable") && err1 == nil
+	return c1 || c2
 }

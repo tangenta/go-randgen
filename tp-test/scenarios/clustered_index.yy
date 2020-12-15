@@ -298,5 +298,5 @@ column_types:
 switch_stmts:
     set @@global.tidb_row_format_version = 2
 |   set @@global.tidb_row_format_version = 1
-|   /*T[test] set @@tidb_enable_clustered_index = 0 */
-|   /*T[test] set @@tidb_enable_clustered_index = 1 */
+|   set @@tidb_enable_clustered_index = 0
+|   set @@tidb_enable_clustered_index = 1
