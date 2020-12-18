@@ -71,7 +71,7 @@
 
 }
 
-init: create_table; insert_data
+init: switch_stmts; create_table; insert_data
 
 txn: rand_queries
 
@@ -98,7 +98,7 @@ char_type:
 |   text
 |   char(40)
 |   blob
-|   binary
+|   binary(255)
 
 key_primary:
  |  , primary key(c_int)
