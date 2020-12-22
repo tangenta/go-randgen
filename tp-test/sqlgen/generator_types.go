@@ -54,9 +54,10 @@ func StrResult(str string) Result {
 
 // Fn is a callable object.
 type Fn struct {
-	Name   string
-	F      func() Result
-	Weight int
+	Name      string
+	F         func() Result
+	Weight    int
+	AfterCall func()
 }
 
 func NewFn(name string, fn func() Fn) Fn {
@@ -81,9 +82,19 @@ func NewConstFn(name string, fn Fn) Fn {
 
 func (f Fn) SetW(weight int) Fn {
 	return Fn{
-		Name:   f.Name,
-		F:      f.F,
-		Weight: weight,
+		Name:      f.Name,
+		F:         f.F,
+		Weight:    weight,
+		AfterCall: f.AfterCall,
+	}
+}
+
+func (f Fn) SetAfterCall(fn func()) Fn {
+	return Fn{
+		Name:      f.Name,
+		F:         f.F,
+		Weight:    f.Weight,
+		AfterCall: fn,
 	}
 }
 
@@ -124,8 +135,8 @@ func Strs(strs ...string) Fn {
 	}
 }
 
-// EmptyStringFn is a Fn which simply returns empty string.
-func EmptyStringFn() Fn {
+// Empty is a Fn which simply returns empty string.
+func Empty() Fn {
 	return innerEmptyFn
 }
 

@@ -42,7 +42,7 @@ func Opt(fn Fn) Fn {
 	if RandomBool() {
 		return fn
 	}
-	return EmptyStringFn()
+	return Empty()
 }
 
 func RandomNum(low, high int64) string {
@@ -66,6 +66,13 @@ func If(condition bool, fn Fn) Fn {
 	return NoneFn()
 }
 
+func OptIf(condition bool, fn Fn) Fn {
+	if condition {
+		return fn
+	}
+	return Empty()
+}
+
 func Or(fns ...Fn) Fn {
 	fns = filterNoneFns(fns)
 	return Fn{Weight: 1, F: func() Result {
@@ -85,7 +92,7 @@ func Or(fns ...Fn) Fn {
 
 func Repeat(fn Fn, cnt int) Fn {
 	if cnt == 0 {
-		return EmptyStringFn()
+		return Empty()
 	}
 	fns := make([]Fn, 0, cnt)
 	for i := 0; i < cnt; i++ {
@@ -147,6 +154,9 @@ func collectResult(fns ...Fn) Result {
 }
 
 func evaluateFn(fn Fn) Result {
+	if fn.AfterCall != nil {
+		defer fn.AfterCall()
+	}
 	if len(fn.Name) == 0 {
 		return fn.F()
 	}

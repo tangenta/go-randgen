@@ -2,63 +2,59 @@ package sqlgen
 
 import (
 	"fmt"
-	"github.com/cznic/mathutil"
 	"math/rand"
 	"strconv"
 	"time"
 )
 
-var (
-	globalTableCounter  int = 0
-	globalColumnCounter int = 0
-	globalIndexCounter  int = 0
-)
-
-func NewRandomTable(columnNumber int) *Table {
-	rand.Seed(time.Now().UnixNano())
-	globalTableCounter++
-	columns := make([]*Column, 0, columnNumber)
-	for i := 0; i < columnNumber; i++ {
-		columns = append(columns, NewRandomColumn())
-	}
-	return &Table{
-		name:    fmt.Sprintf("tbl_%d", globalTableCounter),
-		columns: columns,
-	}
+func (s *State) GetRandTable() *Table {
+	return s.tables[rand.Intn(len(s.tables))]
 }
 
-func NewRandomColumn() *Column {
-	globalColumnCounter++
-	name := fmt.Sprintf("col_%d", globalColumnCounter)
-	tp := ColumnType(rand.Intn(int(ColumnTypeMax)))
-	var (
-		arg1, arg2 int
-		args       []string
-		isUnsigned bool
-	)
-	switch tp {
-	// https://docs.pingcap.com/tidb/stable/data-type-numeric
-	case ColumnTypeFloat | ColumnTypeDouble:
-		arg1 = rand.Intn(256)
-		upper := mathutil.Min(arg1, 30)
-		arg2 = rand.Intn(upper + 1)
-	case ColumnTypeDecimal:
-		arg1 = rand.Intn(66)
-		upper := mathutil.Min(arg1, 30)
-		arg2 = rand.Intn(upper + 1)
-	case ColumnTypeBit:
-		arg1 = 1 + rand.Intn(64)
-	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:
-		arg1 = 1 + rand.Intn(4294967295)
-	case ColumnTypeEnum, ColumnTypeSet:
-		args = []string{"Alice", "Bob", "Charlie", "David"}
-	}
-	if tp.IsIntegerType() {
-		if RandomBool() {
-			isUnsigned = true
+func (t *Table) GetRandColumn() *Column {
+	return t.columns[rand.Intn(len(t.columns))]
+}
+
+func (t *Table) GetRandIntColumn() *Column {
+	for _, c := range t.columns {
+		if c.tp.IsIntegerType() {
+			return c
 		}
 	}
-	return &Column{name, tp, isUnsigned, arg1, arg2, args}
+	return nil
+}
+
+func (t *Table) GenRandValues(cols []*Column) []string {
+	if len(cols) == 0 {
+		cols = t.columns
+	}
+	row := make([]string, len(cols))
+	for i, c := range cols {
+		row[i] = c.RandomValue()
+	}
+	return row
+}
+
+func (t *Table) GetRandColumns() []*Column {
+	if RandomBool() {
+		// insert into t values (...)
+		return nil
+	}
+	// insert into t (cols..) values (...)
+	totalCols := t.columns
+	var selectedCols []*Column
+	for {
+		chosenIdx := rand.Intn(len(totalCols))
+		chosenCol := totalCols[chosenIdx]
+		totalCols[0], totalCols[chosenIdx] = totalCols[chosenIdx], totalCols[0]
+		totalCols = totalCols[1:]
+
+		selectedCols = append(selectedCols, chosenCol)
+		if len(totalCols) == 0 || RandomBool() {
+			break
+		}
+	}
+	return selectedCols
 }
 
 func (c *Column) RandomValue() string {
@@ -108,7 +104,7 @@ func (c *Column) RandomValue() string {
 	case ColumnTypeEnum, ColumnTypeSet:
 		return fmt.Sprintf("'%s'", c.args[rand.Intn(len(c.args))])
 	case ColumnTypeDate, ColumnTypeTime, ColumnTypeDatetime, ColumnTypeTimestamp:
-		return RandDateTime()
+		return fmt.Sprintf("'%s'", RandDateTime())
 	default:
 		return "invalid data type"
 	}
