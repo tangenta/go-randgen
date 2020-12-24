@@ -5,19 +5,25 @@ import (
 	"strings"
 )
 
-func PrintColumnNames(cols []*Column, emptyMarker string) string {
+func PrintColumnNamesWithPar(cols []*Column, emptyMarker string) string {
+	result := PrintColumnNamesWithoutPar(cols, emptyMarker)
+	if result == emptyMarker {
+		return emptyMarker
+	}
+	return "(" + result + ")"
+}
+
+func PrintColumnNamesWithoutPar(cols []*Column, emptyMarker string) string {
 	if len(cols) == 0 {
 		return emptyMarker
 	}
 	var sb strings.Builder
-	sb.WriteString("(")
 	for i, c := range cols {
 		sb.WriteString(c.name)
 		if i != len(cols)-1 {
 			sb.WriteString(",")
 		}
 	}
-	sb.WriteString(")")
 	return sb.String()
 }
 

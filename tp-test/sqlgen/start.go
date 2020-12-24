@@ -25,7 +25,7 @@ func NewGenerator(state *State) func() string {
 
 	start = NewFn("start", func() Fn {
 		return Or(
-			switchSysVars,
+			//switchSysVars,
 			If(len(state.tables) < state.ctrl.MaxTableNum,
 				createTable,
 			).SetW(2),
@@ -43,10 +43,10 @@ func NewGenerator(state *State) func() string {
 
 	switchSysVars = NewFn("switchSysVars", func() Fn {
 		return Or(
-			Str("set @@global.tidb_row_format_version = 2;"),
-			Str("set @@global.tidb_row_format_version = 1;"),
-			Str("set @@tidb_enable_clustered_index = 0;"),
-			Str("set @@tidb_enable_clustered_index = 1;"),
+			Str("set @@global.tidb_row_format_version = 2"),
+			Str("set @@global.tidb_row_format_version = 1"),
+			Str("set @@tidb_enable_clustered_index = 0"),
+			Str("set @@tidb_enable_clustered_index = 1"),
 		)
 	})
 
@@ -97,7 +97,7 @@ func NewGenerator(state *State) func() string {
 			Str(tblName),
 			Str("("),
 			definitions,
-			Str(");"),
+			Str(")"),
 		)
 	})
 
@@ -109,11 +109,11 @@ func NewGenerator(state *State) func() string {
 		return And(
 			Str("insert into"),
 			Str(tbl.name),
-			Str(PrintColumnNames(cols, "")),
+			Str(PrintColumnNamesWithPar(cols, "")),
 			Str("values"),
 			Str("("),
 			Str(PrintRandValues(vals)),
-			Str(");"),
+			Str(")"),
 		)
 	})
 
@@ -123,7 +123,7 @@ func NewGenerator(state *State) func() string {
 		cols := tbl.GetRandColumns()
 		commonSelect = NewFn("commonSelect", func() Fn {
 			return And(Str("select"),
-				Str(PrintColumnNames(cols, "*")),
+				Str(PrintColumnNamesWithoutPar(cols, "*")),
 				Str("from"),
 				Str(tbl.name),
 				Str("where"),
@@ -169,17 +169,17 @@ func NewGenerator(state *State) func() string {
 		})
 
 		return Or(
-			And(commonSelect, forUpdateOpt, Str(";")),
+			And(commonSelect, forUpdateOpt),
 			And(
 				Str("("), commonSelect, forUpdateOpt, Str(")"),
 				union,
-				Str("("), commonSelect, forUpdateOpt, Str(");"),
+				Str("("), commonSelect, forUpdateOpt, Str(")"),
 			),
-			And(aggSelect, forUpdateOpt, Str(";")),
+			And(aggSelect, forUpdateOpt),
 			And(
 				Str("("), aggSelect, forUpdateOpt, Str(")"),
 				union,
-				Str("("), aggSelect, forUpdateOpt, Str(");"),
+				Str("("), aggSelect, forUpdateOpt, Str(")"),
 			),
 		).SetAfterCall(state.DestroyScope)
 	})
@@ -191,10 +191,12 @@ func NewGenerator(state *State) func() string {
 		onDuplicateUpdate = NewFn("onDuplicateUpdate", func() Fn {
 			return Or(
 				Empty().SetW(3),
-				Str("on duplicate key update"),
-				Or(
-					onDupAssignment.SetW(4),
-					And(onDupAssignment, Str(","), onDupAssignment),
+				And(
+					Str("on duplicate key update"),
+					Or(
+						onDupAssignment.SetW(4),
+						And(onDupAssignment, Str(","), onDupAssignment),
+					),
 				),
 			)
 		})
@@ -220,11 +222,10 @@ func NewGenerator(state *State) func() string {
 				Or(Str("insert"), Str("replace")),
 				Str("into"),
 				Str(tbl.name),
-				Str(PrintColumnNames(cols, "")),
+				Str(PrintColumnNamesWithPar(cols, "")),
 				Str("values"),
 				multipleRowVals,
 				onDuplicateUpdate,
-				Str(";"),
 			),
 		)
 	})
@@ -251,11 +252,10 @@ func NewGenerator(state *State) func() string {
 			OptIf(len(orderByCols) != 0,
 				And(
 					Str("order by"),
-					Str(PrintColumnNames(orderByCols, "")),
+					Str(PrintColumnNamesWithPar(orderByCols, "")),
 					maybeLimit,
 				),
 			),
-			Str(";"),
 		).SetAfterCall(state.DestroyScope)
 	})
 
@@ -280,7 +280,6 @@ func NewGenerator(state *State) func() string {
 				And(Str(col.name), Str("in"), Str("("), multipleRowVal, Str(")"), maybeLimit),
 				And(Str(col.name), Str("is null"), maybeLimit),
 			),
-			Str(";"),
 		).SetAfterCall(state.DestroyScope)
 	})
 

@@ -6,6 +6,6 @@ type ControlOption struct {
 
 func DefaultControlOption() *ControlOption {
 	return &ControlOption{
-		MaxTableNum: 5,
+		MaxTableNum: 3,
 	}
 }

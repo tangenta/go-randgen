@@ -103,8 +103,10 @@ func (c *Column) RandomValue() string {
 		return fmt.Sprintf("'%s'", RandStringRunes(rand.Intn(length)))
 	case ColumnTypeEnum, ColumnTypeSet:
 		return fmt.Sprintf("'%s'", c.args[rand.Intn(len(c.args))])
-	case ColumnTypeDate, ColumnTypeTime, ColumnTypeDatetime, ColumnTypeTimestamp:
-		return fmt.Sprintf("'%s'", RandDateTime())
+	case ColumnTypeDate, ColumnTypeDatetime, ColumnTypeTimestamp:
+		return fmt.Sprintf("'%s'", RandDate())
+	case ColumnTypeTime:
+		return fmt.Sprintf("'%s'", RandTime())
 	default:
 		return "invalid data type"
 	}
@@ -120,11 +122,20 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func RandDateTime() string {
+func RandDate() string {
 	min := time.Date(1970, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
 	max := time.Date(2037, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
 	delta := max - min
 
 	sec := rand.Int63n(delta) + min
-	return time.Unix(sec, 0).Format("01-02-2006")
+	return time.Unix(sec, 0).Format("2006-01-02")
+}
+
+func RandTime() string {
+	min := time.Date(1970, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
+	max := time.Date(2037, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
+	delta := max - min
+
+	sec := rand.Int63n(delta) + min
+	return time.Unix(sec, 0).Format("15:04:05.00")
 }

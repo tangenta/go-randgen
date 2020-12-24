@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
@@ -76,9 +75,6 @@ func (s *store) Clear() error { return clearDB(s.db) }
 
 func (s *store) AddTest(test Test) (err error) {
 	defer Return(&err)
-	if len(test.InitSQL) == 0 {
-		return errors.New("init is missing")
-	}
 	if len(test.ID) == 0 {
 		test.ID = uuid.New().String()
 	}

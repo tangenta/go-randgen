@@ -33,10 +33,14 @@ const (
 func (c ColumnType) IsStringType() bool {
 	switch c {
 	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText,
-		ColumnTypeBlob, ColumnTypeBinary, ColumnTypeEnum, ColumnTypeSet:
+		ColumnTypeBlob, ColumnTypeBinary:
 		return true
 	}
 	return false
+}
+
+func (c ColumnType) NeedKeyLength() bool {
+	return c == ColumnTypeBlob || c == ColumnTypeText
 }
 
 func (c ColumnType) IsIntegerType() bool {

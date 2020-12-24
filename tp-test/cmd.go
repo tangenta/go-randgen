@@ -8,10 +8,14 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/pingcap/go-randgen/tp-test/sqlgen"
 	"github.com/spf13/cobra"
+	"github.com/zyguan/sqlz"
 	"github.com/zyguan/sqlz/resultset"
 	"golang.org/x/sync/errgroup"
 )
@@ -37,6 +41,7 @@ func rootCmd() *cobra.Command {
 	cmd.AddCommand(genTestCmd(&g))
 	cmd.AddCommand(runTestCmd(&g))
 	cmd.AddCommand(whyTestCmd(&g))
+	cmd.AddCommand(interactCmd())
 	return cmd
 }
 
@@ -66,6 +71,87 @@ func clearCmd(g *global) *cobra.Command {
 	return cmd
 }
 
+func interactCmd() *cobra.Command {
+	var (
+		stmtCount int
+		dryrun bool
+		dsn1 string
+		dsn2 string
+	)
+
+	cmd := &cobra.Command{
+		Use:           "interact",
+		Short:         "Run tests interactively",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			state := sqlgen.NewState()
+			gen := sqlgen.NewGenerator(state)
+			for i := 0; i < stmtCount; i++ {
+				if dryrun {
+					fmt.Printf("%s\n", gen())
+				} else {
+					prepare := func(dsn string) (db *sql.DB, dbName string, err error) {
+						db, err = sql.Open("mysql", dsn)
+						if err != nil {
+							return
+						}
+						dbName = "db" + strings.ReplaceAll(uuid.New().String(), "-", "_")
+						var conn *sql.Conn
+						conn, err = sqlz.Connect(ctx, db)
+						if err != nil {
+							return
+						}
+						_, err = conn.ExecContext(ctx, "create database "+dbName)
+						if err != nil {
+							return
+						}
+						_, err = conn.ExecContext(ctx, "use "+dbName)
+						if err != nil {
+							return
+						}
+						return
+					}
+					db1, db1Name, err := prepare(dsn1)
+					if err != nil {
+						return err
+					}
+					db2, db2Name, err := prepare(dsn2)
+					if err != nil {
+						return err
+					}
+
+					err = runInteractTest(context.Background(), db1, db2, state, gen())
+					if err != nil {
+						return err
+					}
+
+					hs1, err1 := checkTables(ctx, db1, db1Name)
+					if err1 != nil {
+						return err1
+					}
+					hs2, err2 := checkTables(ctx, db2, db2Name)
+					if err2 != nil {
+						return err2
+					}
+					for t := range hs2 {
+						if hs1[t] != hs2[t] {
+							return fmt.Errorf("data mismatch: %s != %s @%s", hs1[t], hs2[t], t)
+						}
+					}
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&stmtCount, "count", 1, "number of statements to run")
+	cmd.Flags().BoolVar(&dryrun, "dry-run", false, "dry run")
+	cmd.Flags().StringVar(&dsn1, "dsn1", "", "dsn for 1st database")
+	cmd.Flags().StringVar(&dsn2, "dsn2", "", "dsn for 2nd database")
+	return cmd
+}
+
 func genTestCmd(g *global) *cobra.Command {
 	var (
 		opts   genTestOptions
@@ -78,13 +164,15 @@ func genTestCmd(g *global) *cobra.Command {
 		Short:         "Generate tests",
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		Args:          cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			yy, err := ioutil.ReadFile(args[0])
-			if err != nil {
-				return err
+			hasGrammarFile := len(args) == 1
+			if hasGrammarFile {
+				yy, err := ioutil.ReadFile(args[0])
+				if err != nil {
+					return err
+				}
+				opts.Grammar = string(yy)
 			}
-			opts.Grammar = string(yy)
 			for i := 0; i < tests; i++ {
 				t, err := genTest(opts)
 				if err != nil {

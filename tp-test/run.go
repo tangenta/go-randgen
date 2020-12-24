@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/pingcap/go-randgen/tp-test/sqlgen"
 	"github.com/zyguan/sqlz"
 	"github.com/zyguan/sqlz/resultset"
 
@@ -32,6 +33,36 @@ type runABTestOptions struct {
 	DB2  *sql.DB
 
 	Store Store
+}
+
+func runInteractTest(ctx context.Context, db1, db2 *sql.DB, state *sqlgen.State, sql string) error {
+	log.Printf("%s", sql)
+	rs1, err1 := runQuery(ctx, db1, sql)
+	rs2, err2 := runQuery(ctx, db2, sql)
+	if !validateErrs(err1, err2) {
+		return fmt.Errorf("errors mismatch: %v <> %v %q", err1, err2, sql)
+	}
+	if rs1 == nil || rs2 == nil {
+		return nil
+	}
+	h1, h2 := rs1.DataDigest(), rs2.DataDigest()
+	if h1 != h2 {
+		return fmt.Errorf("result digests mismatch: %s != %s %q", h1, h2, sql)
+	}
+	if rs1.IsExecResult() && rs1.ExecResult().RowsAffected != rs2.ExecResult().RowsAffected {
+		return fmt.Errorf("rows affected mismatch: %d != %d %q",
+			rs1.ExecResult().RowsAffected, rs2.ExecResult().RowsAffected, sql)
+	}
+	return nil
+}
+
+func runQuery(ctx context.Context, db *sql.DB, sql string) (*resultset.ResultSet, error) {
+	rows, err := db.QueryContext(ctx, sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return resultset.ReadFromRows(rows)
 }
 
 func runABTest(ctx context.Context, failed chan struct{}, opts runABTestOptions) error {

@@ -12,6 +12,7 @@ import (
 	luaparse "github.com/yuin/gopher-lua/parse"
 
 	sqlgen "github.com/pingcap/go-randgen/grammar/sql_generator"
+	sqlgen2 "github.com/pingcap/go-randgen/tp-test/sqlgen"
 )
 
 //go:generate go run modernc.org/assets -d lib/ -o lib.generated.go --map luaLibs
@@ -27,6 +28,9 @@ type genTestOptions struct {
 
 func genTest(opts genTestOptions) (test Test, err error) {
 	rand.Seed(time.Now().UnixNano())
+	if opts.Grammar == "" {
+		return genTestWithoutGrammarFile(opts)
+	}
 
 	it, err := sqlgen.NewSQLGen(opts.Grammar, nil, setup)
 	if err != nil {
@@ -52,6 +56,19 @@ func genTest(opts genTestOptions) (test Test, err error) {
 		})
 		if err != nil {
 			return Test{}, err
+		}
+		test.Steps = append(test.Steps, txn)
+	}
+	return
+}
+
+func genTestWithoutGrammarFile(opts genTestOptions) (test Test, err error) {
+	gen := sqlgen2.NewGenerator(sqlgen2.NewState())
+	for i := 0; i < opts.NumTxn; i++ {
+		txnStmtCount := 1 + rand.Intn(10);
+		txn := make(Txn, 0, txnStmtCount)
+		for j := 0; j < txnStmtCount; j++ {
+			txn = append(txn, Stmt{Stmt: gen()})
 		}
 		test.Steps = append(test.Steps, txn)
 	}

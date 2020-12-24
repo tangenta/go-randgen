@@ -85,7 +85,11 @@ func GenNewColumn(name string) *Column {
 		col.arg2 = rand.Intn(upper + 1)
 	case ColumnTypeBit:
 		col.arg1 = 1 + rand.Intn(64)
-	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:
+	case ColumnTypeChar, ColumnTypeBinary:
+		col.arg1 = 1 + rand.Intn(255)
+	case ColumnTypeVarchar:
+		col.arg1 = 1 + rand.Intn(1024)
+	case ColumnTypeText, ColumnTypeBlob:
 		col.arg1 = 1 + rand.Intn(4294967295)
 	case ColumnTypeEnum, ColumnTypeSet:
 		col.args = []string{"Alice", "Bob", "Charlie", "David"}
@@ -115,8 +119,9 @@ func GenNewIndex(name string, tbl *Table) *Index {
 
 		idx.columns = append(idx.columns, chosenCol)
 		prefixLen := 0
-		if chosenCol.tp.IsStringType() && rand.Intn(4) == 0 {
-			prefixLen = rand.Intn(5)
+		if chosenCol.tp.NeedKeyLength() ||
+			(chosenCol.tp.IsStringType() && rand.Intn(4) == 0) {
+			prefixLen = 1 + rand.Intn(5)
 		}
 		idx.columnPrefix = append(idx.columnPrefix, prefixLen)
 		if len(totalCols) == 0 || RandomBool() {
