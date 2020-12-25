@@ -33,4 +33,5 @@ var (
 	dropColumn        Fn
 	dmlStmt           Fn
 	ddlStmt           Fn
+	initStart         Fn
 )

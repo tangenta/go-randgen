@@ -1,18 +1,72 @@
 package sqlgen
 
-type ScopeKeyType int8
+type State struct {
+	ctrl *ControlOption
 
-const (
-	ScopeKeyCurrentTable ScopeKeyType = iota
-	ScopeKeyCurrentColumn
-	ScopeKeyCurrentIndex
+	tables     []*Table
+	scope      []map[ScopeKeyType]ScopeObj
+	finishInit bool
+}
 
-	ScopeKeySelectedCols
+type Table struct {
+	name    string
+	columns []*Column
+	indices []*Index
 
-	ScopeKeyTableUniqID
-	ScopeKeyColumnUniqID
-	ScopeKeyIndexUniqID
-)
+	containsPK bool // to ensure at most 1 pk in each table
+	values     [][]string
+}
+
+type Column struct {
+	id   int
+	name string
+	tp   ColumnType
+
+	isUnsigned bool
+	arg1       int      // optional
+	arg2       int      // optional
+	args       []string // for ColumnTypeSet and ColumnTypeEnum
+
+	defaultVal string
+}
+
+type Index struct {
+	id           int
+	name         string
+	tp           IndexType
+	columns      []*Column
+	columnPrefix []int
+}
+
+func NewState() *State {
+	s := &State{
+		ctrl: DefaultControlOption(),
+	}
+	s.CreateScope()
+	return s
+}
+
+type ControlOption struct {
+	// the initial number of tables.
+	InitTableCount int
+	// the number of rows to initialize for each table.
+	InitRowCount int
+
+	// the max number of tables.
+	MaxTableNum int
+	// for the columns that have no default value,
+	// whether allow to omit column names in 'INSERT' statement.
+	StrictTransTable bool
+}
+
+func DefaultControlOption() *ControlOption {
+	return &ControlOption{
+		InitTableCount:   1,
+		MaxTableNum:      1,
+		InitRowCount:     10,
+		StrictTransTable: true,
+	}
+}
 
 type ScopeObj struct {
 	obj interface{}

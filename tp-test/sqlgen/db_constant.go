@@ -113,3 +113,17 @@ const (
 
 	IndexTypeMax
 )
+
+type ScopeKeyType int8
+
+const (
+	ScopeKeyCurrentTable ScopeKeyType = iota
+	ScopeKeyCurrentColumn
+	ScopeKeyCurrentIndex
+
+	ScopeKeySelectedCols
+
+	ScopeKeyTableUniqID
+	ScopeKeyColumnUniqID
+	ScopeKeyIndexUniqID
+)

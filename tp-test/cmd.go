@@ -179,12 +179,10 @@ func genTestCmd(g *global) *cobra.Command {
 					return err
 				}
 				if dryrun {
-					fmt.Printf("-- T%d.0\n", i)
 					for _, stmt := range t.InitSQL {
 						fmt.Println(stmt + ";")
 					}
-					for k, txn := range t.Steps {
-						fmt.Printf("-- T%d.%d\n", i, k+1)
+					for _, txn := range t.Steps {
 						for _, stmt := range txn {
 							fmt.Println(stmt.Stmt+"; -- query:", naiveQueryDetect(stmt.Stmt))
 						}

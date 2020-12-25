@@ -10,7 +10,7 @@ import (
 func NewGenerator(state *State) func() string {
 	rand.Seed(time.Now().UnixNano())
 	retFn := func() string {
-		res := start.F()
+		res := evaluateFn(start)
 		switch res.Tp {
 		case PlainString:
 			return res.Value
@@ -24,6 +24,9 @@ func NewGenerator(state *State) func() string {
 	}
 
 	start = NewFn("start", func() Fn {
+		if state.IsInitializing() {
+			return initStart
+		}
 		return Or(
 			//switchSysVars,
 			If(len(state.tables) < state.ctrl.MaxTableNum,
@@ -38,9 +41,19 @@ func NewGenerator(state *State) func() string {
 		)
 	})
 
+	initStart = NewFn("initStart", func() Fn {
+		return Or(
+			If(len(state.tables) < state.ctrl.InitTableCount,
+				createTable,
+			).SetW(3),
+			If(len(state.tables) > 0,
+				insertInto,
+			),
+		)
+	})
+
 	dmlStmt = NewFn("dmlStmt", func() Fn {
 		return Or(
-			insertInto,
 			query,
 			commonDelete,
 			commonInsert,
@@ -51,6 +64,7 @@ func NewGenerator(state *State) func() string {
 	ddlStmt = NewFn("ddlStmt", func() Fn {
 		tbl := state.GetRandTable()
 		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
+		ddlStmt.SetAfterCall(state.DestroyScope)
 		return Or(
 			addColumn,
 			addIndex,
@@ -60,7 +74,7 @@ func NewGenerator(state *State) func() string {
 			If(len(tbl.indices) > 0,
 				dropIndex,
 			),
-		).SetAfterCall(state.DestroyScope)
+		)
 	})
 
 	switchSysVars = NewFn("switchSysVars", func() Fn {
@@ -76,6 +90,7 @@ func NewGenerator(state *State) func() string {
 		tblName := fmt.Sprintf("tbl_%d", state.AllocGlobalID(ScopeKeyTableUniqID))
 		tbl := GenNewTable(tblName)
 		state.AppendTable(tbl)
+		createTable.SetAfterCall(tbl.ReorderColumns)
 		definitions = NewFn("definitions", func() Fn {
 			colDefs = NewFn("colDefs", func() Fn {
 				return Or(
@@ -84,10 +99,9 @@ func NewGenerator(state *State) func() string {
 				)
 			})
 			colDef = NewFn("colDef", func() Fn {
-				colName := fmt.Sprintf("col_%d", state.AllocGlobalID(ScopeKeyColumnUniqID))
-				col := GenNewColumn(colName)
+				col := GenNewColumn(state.AllocGlobalID(ScopeKeyColumnUniqID))
 				tbl.AppendColumn(col)
-				return And(Str(colName), Str(PrintColumnType(col)))
+				return And(Str(col.name), Str(PrintColumnType(col)))
 			})
 			idxDefs = NewFn("idxDefs", func() Fn {
 				return Or(
@@ -96,13 +110,12 @@ func NewGenerator(state *State) func() string {
 				)
 			})
 			idxDef = NewFn("idxDef", func() Fn {
-				idxName := fmt.Sprintf("idx_%d", state.AllocGlobalID(ScopeKeyIndexUniqID))
-				idx := GenNewIndex(idxName, tbl)
+				idx := GenNewIndex(state.AllocGlobalID(ScopeKeyIndexUniqID), tbl)
 				tbl.AppendIndex(idx)
 				return And(
 					Str(PrintIndexType(idx)),
 					Str("key"),
-					Str(idxName),
+					Str(idx.name),
 					Str("("),
 					Str(PrintIndexColumnNames(idx)),
 					Str(")"),
@@ -124,19 +137,12 @@ func NewGenerator(state *State) func() string {
 	})
 
 	insertInto = NewFn("insertInto", func() Fn {
-		tbl := state.GetRandTable()
-		var cols []*Column
-		if state.ctrl.StrictTransTable {
-			cols = tbl.GetRandColumnsIncludedDefaultValue()
-		} else {
-			cols = tbl.GetRandColumns()
-		}
-		vals := tbl.GenRandValues(cols)
+		tbl := state.GetFirstNonFullTable()
+		vals := tbl.GenRandValues(tbl.columns)
 		tbl.AppendRow(vals)
 		return And(
 			Str("insert into"),
 			Str(tbl.name),
-			Str(PrintColumnNamesWithPar(cols, "")),
 			Str("values"),
 			Str("("),
 			Str(PrintRandValues(vals)),
@@ -147,6 +153,7 @@ func NewGenerator(state *State) func() string {
 	query = NewFn("query", func() Fn {
 		tbl := state.GetRandTable()
 		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
+		query.SetAfterCall(state.DestroyScope)
 		cols := tbl.GetRandColumns()
 		commonSelect = NewFn("commonSelect", func() Fn {
 			return And(Str("select"),
@@ -208,7 +215,7 @@ func NewGenerator(state *State) func() string {
 				union,
 				Str("("), aggSelect, forUpdateOpt, Str(")"),
 			),
-		).SetAfterCall(state.DestroyScope)
+		)
 	})
 
 	commonInsert = NewFn("commonInsert", func() Fn {
@@ -271,6 +278,7 @@ func NewGenerator(state *State) func() string {
 	commonUpdate = NewFn("commonUpdate", func() Fn {
 		tbl := state.GetRandTable()
 		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
+		commonUpdate.SetAfterCall(state.DestroyScope)
 		orderByCols := tbl.GetRandColumns()
 
 		updateAssignment = NewFn("updateAssignment", func() Fn {
@@ -294,13 +302,14 @@ func NewGenerator(state *State) func() string {
 					maybeLimit,
 				),
 			),
-		).SetAfterCall(state.DestroyScope)
+		)
 	})
 
 	commonDelete = NewFn("commonDelete", func() Fn {
 		tbl := state.GetRandTable()
 		col := tbl.GetRandColumn()
 		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
+		commonDelete.SetAfterCall(state.DestroyScope)
 
 		multipleRowVal = NewFn("multipleRowVal", func() Fn {
 			return Or(
@@ -318,7 +327,7 @@ func NewGenerator(state *State) func() string {
 				And(Str(col.name), Str("in"), Str("("), multipleRowVal, Str(")"), maybeLimit),
 				And(Str(col.name), Str("is null"), maybeLimit),
 			),
-		).SetAfterCall(state.DestroyScope)
+		)
 	})
 
 	predicates = NewFn("predicates", func() Fn {
@@ -352,8 +361,7 @@ func NewGenerator(state *State) func() string {
 
 	addIndex = NewFn("addIndex", func() Fn {
 		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
-		idxName := fmt.Sprintf("idx_%d", state.AllocGlobalID(ScopeKeyIndexUniqID))
-		idx := GenNewIndex(idxName, tbl)
+		idx := GenNewIndex(state.AllocGlobalID(ScopeKeyIndexUniqID), tbl)
 		tbl.AppendIndex(idx)
 
 		return Strs(
@@ -375,8 +383,7 @@ func NewGenerator(state *State) func() string {
 
 	addColumn = NewFn("addColumn", func() Fn {
 		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
-		colName := fmt.Sprintf("col_%d", state.AllocGlobalID(ScopeKeyColumnUniqID))
-		col := GenNewColumn(colName)
+		col := GenNewColumn(state.AllocGlobalID(ScopeKeyColumnUniqID))
 		tbl.AppendColumn(col)
 		return Strs(
 			"alter table", tbl.name,

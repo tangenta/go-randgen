@@ -1,14 +1,36 @@
 package sqlgen
 
 import (
-	"fmt"
 	"math/rand"
-	"strconv"
-	"time"
 )
+
+func (s *State) IsInitializing() bool {
+	if s.finishInit {
+		return false
+	}
+	if len(s.tables) < s.ctrl.InitTableCount {
+		return true
+	}
+	for _, t := range s.tables {
+		if len(t.values) < s.ctrl.InitRowCount {
+			return true
+		}
+	}
+	s.finishInit = true
+	return false
+}
 
 func (s *State) GetRandTable() *Table {
 	return s.tables[rand.Intn(len(s.tables))]
+}
+
+func (s *State) GetFirstNonFullTable() *Table {
+	for _, t := range s.tables {
+		if len(t.values) < s.ctrl.InitRowCount {
+			return t
+		}
+	}
+	return nil
 }
 
 func (t *Table) GetRandColumn() *Column {
@@ -49,6 +71,16 @@ func (t *Table) GetRandColumnsIncludedDefaultValue() []*Column {
 		selectedCols = append(selectedCols, chosenCol)
 	}
 	return selectedCols
+}
+
+func (t *Table) HasColumnUncoveredByIndex() bool {
+	indexedCols := make(map[string]struct{})
+	for _, idx := range t.indices {
+		for _, c := range idx.columns {
+			indexedCols[c.name] = struct{}{}
+		}
+	}
+	return len(t.columns) != len(indexedCols)
 }
 
 func (t *Table) FilterColumns(pred func(column *Column) bool) []*Column {
@@ -113,99 +145,4 @@ func (t *Table) GetRandColumns() []*Column {
 		}
 	}
 	return selectedCols
-}
-
-func (c *Column) RandomValue() string {
-	if c.isUnsigned {
-		switch c.tp {
-		case ColumnTypeTinyInt:
-			return RandomNum(0, 255)
-		case ColumnTypeSmallInt:
-			return RandomNum(0, 65535)
-		case ColumnTypeMediumInt:
-			return RandomNum(0, 16777215)
-		case ColumnTypeInt:
-			return RandomNum(0, 4294967295)
-		case ColumnTypeBigInt:
-			return RandomNum(0, 9223372036854775806)
-		}
-	}
-	switch c.tp {
-	case ColumnTypeTinyInt:
-		return RandomNum(-128, 127)
-	case ColumnTypeSmallInt:
-		return RandomNum(-32768, 32767)
-	case ColumnTypeMediumInt:
-		return RandomNum(-8388608, 8388607)
-	case ColumnTypeInt:
-		return RandomNum(-2147483648, 2147483647)
-	case ColumnTypeBigInt:
-		num := rand.Int63()
-		if RandomBool() {
-			num = -num
-		}
-		return strconv.FormatInt(num, 10)
-	case ColumnTypeBoolean:
-		return RandomNum(0, 1)
-	case ColumnTypeFloat, ColumnTypeDouble:
-		return RandomFloat(0, 10000)
-	case ColumnTypeDecimal:
-		return fmt.Sprintf("%s.%s", RandNumRunes(c.arg1-c.arg2), RandNumRunes(c.arg2))
-	case ColumnTypeBit:
-		return RandomNum(0, (1<<c.arg1)-1)
-	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:
-		length := c.arg1
-		if length == 0 {
-			length = 5
-		} else if length > 20 {
-			length = 20
-		}
-		return fmt.Sprintf("'%s'", RandStringRunes(rand.Intn(length)))
-	case ColumnTypeEnum, ColumnTypeSet:
-		return fmt.Sprintf("'%s'", c.args[rand.Intn(len(c.args))])
-	case ColumnTypeDate, ColumnTypeDatetime, ColumnTypeTimestamp:
-		return fmt.Sprintf("'%s'", RandDate())
-	case ColumnTypeTime:
-		return fmt.Sprintf("'%s'", RandTime())
-	default:
-		return "invalid data type"
-	}
-}
-
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func RandStringRunes(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
-
-var numRunes = []rune("0123456789")
-
-func RandNumRunes(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = numRunes[rand.Intn(len(numRunes))]
-	}
-	return string(b)
-}
-
-func RandDate() string {
-	min := time.Date(1970, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
-	max := time.Date(2037, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
-	delta := max - min
-
-	sec := rand.Int63n(delta) + min
-	return time.Unix(sec, 0).Format("2006-01-02")
-}
-
-func RandTime() string {
-	min := time.Date(1970, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
-	max := time.Date(2037, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
-	delta := max - min
-
-	sec := rand.Int63n(delta) + min
-	return time.Unix(sec, 0).Format("15:04:05.00")
 }

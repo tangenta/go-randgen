@@ -64,17 +64,7 @@ func NewFn(name string, fn func() Fn) Fn {
 	return Fn{
 		Name: name,
 		F: func() Result {
-			return fn().F()
-		},
-		Weight: 1,
-	}
-}
-
-func NewConstFn(name string, fn Fn) Fn {
-	return Fn{
-		Name: name,
-		F: func() Result {
-			return fn.F()
+			return evaluateFn(fn())
 		},
 		Weight: 1,
 	}
@@ -101,6 +91,7 @@ func (f Fn) SetAfterCall(fn func()) Fn {
 // Str is a Fn which simply returns str.
 func Str(str string) Fn {
 	return Fn{
+		Name:   str,
 		Weight: 1,
 		F: func() Result {
 			return StrResult(str)
