@@ -29,6 +29,8 @@ type Column struct {
 	arg1       int      // optional
 	arg2       int      // optional
 	args       []string // for ColumnTypeSet and ColumnTypeEnum
+
+	defaultVal string
 }
 
 type Index struct {
@@ -128,6 +130,9 @@ func GenNewColumn(name string) *Column {
 	}
 	if col.tp.IsIntegerType() {
 		col.isUnsigned = RandomBool()
+	}
+	if !col.tp.DisallowDefaultValue() && RandomBool() {
+		col.defaultVal = col.RandomValue()
 	}
 	return col
 }

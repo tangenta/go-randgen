@@ -51,6 +51,11 @@ func (c ColumnType) IsIntegerType() bool {
 	return false
 }
 
+// BLOB/TEXT/JSON column can't have a default value.
+func (c ColumnType) DisallowDefaultValue() bool {
+	return c == ColumnTypeText || c == ColumnTypeBlob
+}
+
 func (c ColumnType) String() string {
 	switch c {
 	case ColumnTypeInt:

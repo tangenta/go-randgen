@@ -57,6 +57,10 @@ func PrintColumnType(c *Column) string {
 	if c.isUnsigned {
 		sb.WriteString(" unsigned")
 	}
+	if c.defaultVal != "" {
+		sb.WriteString(" default ")
+		sb.WriteString(c.defaultVal)
+	}
 	return sb.String()
 }
 

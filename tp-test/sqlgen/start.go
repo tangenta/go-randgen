@@ -125,7 +125,12 @@ func NewGenerator(state *State) func() string {
 
 	insertInto = NewFn("insertInto", func() Fn {
 		tbl := state.GetRandTable()
-		cols := tbl.GetRandColumns()
+		var cols []*Column
+		if state.ctrl.StrictTransTable {
+			cols = tbl.GetRandColumnsIncludedDefaultValue()
+		} else {
+			cols = tbl.GetRandColumns()
+		}
 		vals := tbl.GenRandValues(cols)
 		tbl.AppendRow(vals)
 		return And(
@@ -208,7 +213,16 @@ func NewGenerator(state *State) func() string {
 
 	commonInsert = NewFn("commonInsert", func() Fn {
 		tbl := state.GetRandTable()
-		cols := tbl.GetRandColumns()
+		var cols []*Column
+		if state.ctrl.StrictTransTable {
+			cols = tbl.GetRandColumnsIncludedDefaultValue()
+		} else {
+			cols = tbl.GetRandColumns()
+		}
+		insertOrReplace := "insert"
+		if rand.Intn(3) == 0 {
+			insertOrReplace = "replace"
+		}
 
 		onDuplicateUpdate = NewFn("onDuplicateUpdate", func() Fn {
 			return Or(
@@ -227,7 +241,9 @@ func NewGenerator(state *State) func() string {
 			randCol := tbl.GetRandColumn()
 			return Or(
 				Strs(randCol.name, "=", randCol.RandomValue()),
-				Strs(randCol.name, "=", "values(", randCol.name, ")"),
+				If(insertOrReplace == "insert",
+					Strs(randCol.name, "=", "values(", randCol.name, ")"),
+				),
 			)
 		})
 
@@ -241,7 +257,7 @@ func NewGenerator(state *State) func() string {
 
 		return Or(
 			And(
-				Or(Str("insert"), Str("replace")),
+				Str(insertOrReplace),
 				Str("into"),
 				Str(tbl.name),
 				Str(PrintColumnNamesWithPar(cols, "")),

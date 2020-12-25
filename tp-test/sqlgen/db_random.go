@@ -32,6 +32,35 @@ func (t *Table) GetRandColumnWithIndexUncovered() *Column {
 	return restCols[rand.Intn(len(restCols))]
 }
 
+func (t *Table) GetRandColumnsIncludedDefaultValue() []*Column {
+	if RandomBool() {
+		// insert into t values (...)
+		return nil
+	}
+	// insert into t (cols..) values (...)
+	totalCols := t.FilterColumns(func(c *Column) bool { return c.defaultVal != "" })
+	selectedCols := t.FilterColumns(func(c *Column) bool { return c.defaultVal == "" })
+	for len(totalCols) > 0 && RandomBool() {
+		chosenIdx := rand.Intn(len(totalCols))
+		chosenCol := totalCols[chosenIdx]
+		totalCols[0], totalCols[chosenIdx] = totalCols[chosenIdx], totalCols[0]
+		totalCols = totalCols[1:]
+
+		selectedCols = append(selectedCols, chosenCol)
+	}
+	return selectedCols
+}
+
+func (t *Table) FilterColumns(pred func(column *Column) bool) []*Column {
+	restCols := make([]*Column, 0, len(t.columns))
+	for _, c := range t.columns {
+		if pred(c) {
+			restCols = append(restCols, c)
+		}
+	}
+	return restCols
+}
+
 func (t *Table) GetRandomIndex() *Index {
 	return t.indices[rand.Intn(len(t.indices))]
 }
