@@ -65,7 +65,7 @@ func genTest(opts genTestOptions) (test Test, err error) {
 func genTestWithoutGrammarFile(opts genTestOptions) (test Test, err error) {
 	gen := sqlgen2.NewGenerator(sqlgen2.NewState())
 	for i := 0; i < opts.NumTxn; i++ {
-		txnStmtCount := 1 + rand.Intn(10);
+		txnStmtCount := 1 + rand.Intn(10)
 		txn := make(Txn, 0, txnStmtCount)
 		for j := 0; j < txnStmtCount; j++ {
 			txn = append(txn, Stmt{Stmt: gen()})

@@ -28,17 +28,39 @@ func NewGenerator(state *State) func() string {
 			//switchSysVars,
 			If(len(state.tables) < state.ctrl.MaxTableNum,
 				createTable,
-			).SetW(2),
+			).SetW(3),
 			If(len(state.tables) > 0,
 				Or(
-					insertInto,
-					query,
-					commonDelete,
-					commonInsert,
-					commonUpdate,
+					dmlStmt.SetW(4),
+					ddlStmt.SetW(1),
 				),
-			).SetW(3),
+			).SetW(5),
 		)
+	})
+
+	dmlStmt = NewFn("dmlStmt", func() Fn {
+		return Or(
+			insertInto,
+			query,
+			commonDelete,
+			commonInsert,
+			commonUpdate,
+		)
+	})
+
+	ddlStmt = NewFn("ddlStmt", func() Fn {
+		tbl := state.GetRandTable()
+		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
+		return Or(
+			addColumn,
+			addIndex,
+			If(len(tbl.columns) > 1 && tbl.HasColumnUncoveredByIndex(),
+				dropColumn,
+			),
+			If(len(tbl.indices) > 0,
+				dropIndex,
+			),
+		).SetAfterCall(state.DestroyScope)
 	})
 
 	switchSysVars = NewFn("switchSysVars", func() Fn {
@@ -309,6 +331,50 @@ func NewGenerator(state *State) func() string {
 		return Or(
 			Empty().SetW(3),
 			Strs("limit", RandomNum(1, 10)),
+		)
+	})
+
+	addIndex = NewFn("addIndex", func() Fn {
+		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
+		idxName := fmt.Sprintf("idx_%d", state.AllocGlobalID(ScopeKeyIndexUniqID))
+		idx := GenNewIndex(idxName, tbl)
+		tbl.AppendIndex(idx)
+
+		return Strs(
+			"alter table", tbl.name,
+			"add index", idx.name,
+			"(", PrintIndexColumnNames(idx), ")",
+		)
+	})
+
+	dropIndex = NewFn("dropIndex", func() Fn {
+		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
+		idx := tbl.GetRandomIndex()
+		tbl.RemoveIndex(idx)
+		return Strs(
+			"alter table", tbl.name,
+			"drop index", idx.name,
+		)
+	})
+
+	addColumn = NewFn("addColumn", func() Fn {
+		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
+		colName := fmt.Sprintf("col_%d", state.AllocGlobalID(ScopeKeyColumnUniqID))
+		col := GenNewColumn(colName)
+		tbl.AppendColumn(col)
+		return Strs(
+			"alter table", tbl.name,
+			"add column", col.name, PrintColumnType(col),
+		)
+	})
+
+	dropColumn = NewFn("dropColumn", func() Fn {
+		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
+		col := tbl.GetRandColumnWithIndexUncovered()
+		tbl.RemoveColumn(col)
+		return Strs(
+			"alter table", tbl.name,
+			"drop column", col.name,
 		)
 	})
 

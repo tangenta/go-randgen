@@ -58,8 +58,40 @@ func (t *Table) AppendColumn(c *Column) {
 	t.columns = append(t.columns, c)
 }
 
+func (t *Table) RemoveColumn(c *Column) {
+	var pos int
+	for i := range t.columns {
+		if t.columns[i].name == c.name {
+			pos = i
+			break
+		}
+	}
+	t.columns = append(t.columns[:pos], t.columns[pos+1:]...)
+}
+
 func (t *Table) AppendIndex(idx *Index) {
 	t.indices = append(t.indices, idx)
+}
+
+func (t *Table) RemoveIndex(idx *Index) {
+	var pos int
+	for i := range t.indices {
+		if t.indices[i].name == idx.name {
+			pos = i
+			break
+		}
+	}
+	t.indices = append(t.indices[:pos], t.indices[pos+1:]...)
+}
+
+func (t *Table) HasColumnUncoveredByIndex() bool {
+	indexedCols := make(map[string]struct{})
+	for _, idx := range t.indices {
+		for _, c := range idx.columns {
+			indexedCols[c.name] = struct{}{}
+		}
+	}
+	return len(t.columns) != len(indexedCols)
 }
 
 func (t *Table) AppendRow(row []string) {

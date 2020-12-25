@@ -74,9 +74,9 @@ func clearCmd(g *global) *cobra.Command {
 func interactCmd() *cobra.Command {
 	var (
 		stmtCount int
-		dryrun bool
-		dsn1 string
-		dsn2 string
+		dryrun    bool
+		dsn1      string
+		dsn2      string
 	)
 
 	cmd := &cobra.Command{

@@ -27,4 +27,10 @@ var (
 	updateAssignment  Fn
 	commonDelete      Fn
 	maybeLimit        Fn
+	addIndex          Fn
+	dropIndex         Fn
+	addColumn         Fn
+	dropColumn        Fn
+	dmlStmt           Fn
+	ddlStmt           Fn
 )

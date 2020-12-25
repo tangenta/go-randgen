@@ -15,6 +15,27 @@ func (t *Table) GetRandColumn() *Column {
 	return t.columns[rand.Intn(len(t.columns))]
 }
 
+func (t *Table) GetRandColumnWithIndexUncovered() *Column {
+	restCols := make([]*Column, 0, len(t.columns))
+	for _, c := range t.columns {
+		hasBeenCovered := false
+		for _, idx := range t.indices {
+			if idx.name == c.name {
+				hasBeenCovered = true
+				break
+			}
+		}
+		if !hasBeenCovered {
+			restCols = append(restCols, c)
+		}
+	}
+	return restCols[rand.Intn(len(restCols))]
+}
+
+func (t *Table) GetRandomIndex() *Index {
+	return t.indices[rand.Intn(len(t.indices))]
+}
+
 func (t *Table) GetRandIntColumn() *Column {
 	for _, c := range t.columns {
 		if c.tp.IsIntegerType() {
@@ -35,13 +56,21 @@ func (t *Table) GenRandValues(cols []*Column) []string {
 	return row
 }
 
+func (t *Table) cloneColumns() []*Column {
+	cols := make([]*Column, len(t.columns))
+	for i, c := range t.columns {
+		cols[i] = c
+	}
+	return cols
+}
+
 func (t *Table) GetRandColumns() []*Column {
 	if RandomBool() {
 		// insert into t values (...)
 		return nil
 	}
 	// insert into t (cols..) values (...)
-	totalCols := t.columns
+	totalCols := t.cloneColumns()
 	var selectedCols []*Column
 	for {
 		chosenIdx := rand.Intn(len(totalCols))
@@ -89,8 +118,10 @@ func (c *Column) RandomValue() string {
 		return strconv.FormatInt(num, 10)
 	case ColumnTypeBoolean:
 		return RandomNum(0, 1)
-	case ColumnTypeFloat, ColumnTypeDouble, ColumnTypeDecimal:
-		return RandomFloat(0, 3.402823466e+38)
+	case ColumnTypeFloat, ColumnTypeDouble:
+		return RandomFloat(0, 10000)
+	case ColumnTypeDecimal:
+		return fmt.Sprintf("%s.%s", RandNumRunes(c.arg1-c.arg2), RandNumRunes(c.arg2))
 	case ColumnTypeBit:
 		return RandomNum(0, (1<<c.arg1)-1)
 	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:
@@ -118,6 +149,16 @@ func RandStringRunes(n int) string {
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
+var numRunes = []rune("0123456789")
+
+func RandNumRunes(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = numRunes[rand.Intn(len(numRunes))]
 	}
 	return string(b)
 }
