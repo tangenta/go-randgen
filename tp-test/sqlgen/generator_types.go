@@ -54,10 +54,9 @@ func StrResult(str string) Result {
 
 // Fn is a callable object.
 type Fn struct {
-	Name      string
-	F         func() Result
-	Weight    int
-	AfterCall func()
+	Name   string
+	F      func() Result
+	Weight int
 }
 
 func NewFn(name string, fn func() Fn) Fn {
@@ -72,26 +71,15 @@ func NewFn(name string, fn func() Fn) Fn {
 
 func (f Fn) SetW(weight int) Fn {
 	return Fn{
-		Name:      f.Name,
-		F:         f.F,
-		Weight:    weight,
-		AfterCall: f.AfterCall,
-	}
-}
-
-func (f Fn) SetAfterCall(fn func()) Fn {
-	return Fn{
-		Name:      f.Name,
-		F:         f.F,
-		Weight:    f.Weight,
-		AfterCall: fn,
+		Name:   f.Name,
+		F:      f.F,
+		Weight: weight,
 	}
 }
 
 // Str is a Fn which simply returns str.
 func Str(str string) Fn {
 	return Fn{
-		Name:   str,
 		Weight: 1,
 		F: func() Result {
 			return StrResult(str)

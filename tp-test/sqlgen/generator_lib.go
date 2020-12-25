@@ -156,18 +156,12 @@ func collectResult(fns ...Fn) Result {
 func evaluateFn(fn Fn) Result {
 	if len(fn.Name) == 0 {
 		rs := fn.F()
-		if fn.AfterCall != nil {
-			fn.AfterCall()
-		}
 		return rs
 	}
 	forEachProdListener(func(p ProductionListener) {
 		p.BeforeProductionGen(&fn)
 	})
 	res := fn.F()
-	if fn.AfterCall != nil {
-		fn.AfterCall()
-	}
 	forEachProdListener(func(p ProductionListener) {
 		p.AfterProductionGen(&fn, &res)
 	})

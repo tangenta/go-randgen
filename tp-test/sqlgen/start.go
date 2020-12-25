@@ -9,6 +9,9 @@ import (
 
 func NewGenerator(state *State) func() string {
 	rand.Seed(time.Now().UnixNano())
+	GenPlugins = append(GenPlugins, &ScopeListener{state: state})
+	postListener := &PostListener{callbacks: map[string]func(){}}
+	GenPlugins = append(GenPlugins, postListener)
 	retFn := func() string {
 		res := evaluateFn(start)
 		switch res.Tp {
@@ -63,8 +66,7 @@ func NewGenerator(state *State) func() string {
 
 	ddlStmt = NewFn("ddlStmt", func() Fn {
 		tbl := state.GetRandTable()
-		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
-		ddlStmt.SetAfterCall(state.DestroyScope)
+		state.Store(ScopeKeyCurrentTable, NewScopeObj(tbl))
 		return Or(
 			addColumn,
 			addIndex,
@@ -90,7 +92,7 @@ func NewGenerator(state *State) func() string {
 		tblName := fmt.Sprintf("tbl_%d", state.AllocGlobalID(ScopeKeyTableUniqID))
 		tbl := GenNewTable(tblName)
 		state.AppendTable(tbl)
-		createTable.SetAfterCall(tbl.ReorderColumns)
+		postListener.Register("createTable", tbl.ReorderColumns)
 		definitions = NewFn("definitions", func() Fn {
 			colDefs = NewFn("colDefs", func() Fn {
 				return Or(
@@ -152,8 +154,7 @@ func NewGenerator(state *State) func() string {
 
 	query = NewFn("query", func() Fn {
 		tbl := state.GetRandTable()
-		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
-		query.SetAfterCall(state.DestroyScope)
+		state.Store(ScopeKeyCurrentTable, NewScopeObj(tbl))
 		cols := tbl.GetRandColumns()
 		commonSelect = NewFn("commonSelect", func() Fn {
 			return And(Str("select"),
@@ -277,8 +278,7 @@ func NewGenerator(state *State) func() string {
 
 	commonUpdate = NewFn("commonUpdate", func() Fn {
 		tbl := state.GetRandTable()
-		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
-		commonUpdate.SetAfterCall(state.DestroyScope)
+		state.Store(ScopeKeyCurrentTable, NewScopeObj(tbl))
 		orderByCols := tbl.GetRandColumns()
 
 		updateAssignment = NewFn("updateAssignment", func() Fn {
@@ -308,8 +308,7 @@ func NewGenerator(state *State) func() string {
 	commonDelete = NewFn("commonDelete", func() Fn {
 		tbl := state.GetRandTable()
 		col := tbl.GetRandColumn()
-		state.CreateScopeAndStore(ScopeKeyCurrentTable, NewScopeObj(tbl))
-		commonDelete.SetAfterCall(state.DestroyScope)
+		state.Store(ScopeKeyCurrentTable, NewScopeObj(tbl))
 
 		multipleRowVal = NewFn("multipleRowVal", func() Fn {
 			return Or(

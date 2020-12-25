@@ -27,7 +27,7 @@ func GenNewColumn(id int) *Column {
 		upper := mathutil.Min(col.arg1, 30)
 		col.arg2 = rand.Intn(upper + 1)
 	case ColumnTypeBit:
-		col.arg1 = 1 + rand.Intn(63)
+		col.arg1 = 1 + rand.Intn(62)
 	case ColumnTypeChar, ColumnTypeBinary:
 		col.arg1 = 1 + rand.Intn(255)
 	case ColumnTypeVarchar:
@@ -113,9 +113,13 @@ func (c *Column) RandomValue() string {
 		if c.arg1 == 0 && c.arg2 == 0 {
 			return RandomFloat(0, 10000)
 		}
-		return fmt.Sprintf("%s.%s", RandNumRunes(c.arg1-c.arg2), RandNumRunes(c.arg2))
+		left := rand.Intn(mathutil.Min(c.arg1-c.arg2, 6))
+		right := rand.Intn(mathutil.Min(c.arg2, 4))
+		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
 	case ColumnTypeDecimal:
-		return fmt.Sprintf("%s.%s", RandNumRunes(c.arg1-c.arg2), RandNumRunes(c.arg2))
+		left := rand.Intn(mathutil.Min(c.arg1-c.arg2, 6))
+		right := rand.Intn(mathutil.Min(c.arg2, 4))
+		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
 	case ColumnTypeBit:
 		return RandomNum(0, (1<<c.arg1)-1)
 	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:

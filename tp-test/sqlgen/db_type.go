@@ -133,11 +133,46 @@ func (s *State) CreateScopeAndStore(key ScopeKeyType, val ScopeObj) {
 
 func (s *State) AllocGlobalID(key ScopeKeyType) int {
 	var result int
-	if v := s.Search(key); !v.IsNil() {
+
+	if v, ok := s.scope[0][key]; ok {
 		result = v.ToInt()
 	} else {
 		result = 0
 	}
-	s.Store(key, NewScopeObj(result+1))
+	s.scope[0][key] = NewScopeObj(result + 1)
 	return result
+}
+
+type ScopeListener struct {
+	state *State
+}
+
+func (s *ScopeListener) BeforeProductionGen(fn *Fn) {
+	s.state.CreateScope()
+}
+
+func (s *ScopeListener) AfterProductionGen(fn *Fn, result *Result) {
+	s.state.DestroyScope()
+}
+
+func (s *ScopeListener) ProductionCancel(fn *Fn) {
+	return
+}
+
+type PostListener struct {
+	callbacks map[string]func()
+}
+
+func (p *PostListener) BeforeProductionGen(fn *Fn) {}
+
+func (p *PostListener) AfterProductionGen(fn *Fn, result *Result) {
+	if f, ok := p.callbacks[fn.Name]; ok {
+		f()
+	}
+}
+
+func (p *PostListener) ProductionCancel(fn *Fn) {}
+
+func (p *PostListener) Register(fnName string, fn func()) {
+	p.callbacks[fnName] = fn
 }
