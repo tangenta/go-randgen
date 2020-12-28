@@ -249,9 +249,7 @@ func NewGenerator(state *State) func() string {
 			randCol := tbl.GetRandColumn()
 			return Or(
 				Strs(randCol.name, "=", randCol.RandomValue()),
-				If(insertOrReplace == "insert",
-					Strs(randCol.name, "=", "values(", randCol.name, ")"),
-				),
+				Strs(randCol.name, "=", "values(", randCol.name, ")"),
 			)
 		})
 
@@ -271,7 +269,7 @@ func NewGenerator(state *State) func() string {
 				Str(PrintColumnNamesWithPar(cols, "")),
 				Str("values"),
 				multipleRowVals,
-				onDuplicateUpdate,
+				OptIf(insertOrReplace == "insert", onDuplicateUpdate),
 			),
 		)
 	})
@@ -295,10 +293,10 @@ func NewGenerator(state *State) func() string {
 			updateAssignment,
 			Str("where"),
 			predicates,
-			OptIf(len(orderByCols) != 0,
+			OptIf(len(orderByCols) > 0,
 				And(
 					Str("order by"),
-					Str(PrintColumnNamesWithPar(orderByCols, "")),
+					Str(PrintColumnNamesWithoutPar(orderByCols, "")),
 					maybeLimit,
 				),
 			),
@@ -340,9 +338,15 @@ func NewGenerator(state *State) func() string {
 		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
 		randCol := tbl.GetRandColumn()
 		randColVals = NewFn("randColVals", func() Fn {
+			var randVal string
+			if rand.Intn(3) == 0 || len(tbl.values) == 0 {
+				randVal = randCol.RandomValue()
+			} else {
+				randVal = tbl.GetRandRowVal(randCol)
+			}
 			return Or(
-				Str(randCol.RandomValue()),
-				And(Str(randCol.RandomValue()), Str(","), randColVals),
+				Str(randVal),
+				And(Str(randVal), Str(","), randColVals).SetW(3),
 			)
 		})
 		return Or(

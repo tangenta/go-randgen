@@ -8,6 +8,6 @@ import (
 func TestA(t *testing.T) {
 	gen := NewGenerator(NewState())
 	for i := 0; i < 200; i++ {
-		fmt.Println(gen())
+		fmt.Printf("%s;\n", gen())
 	}
 }

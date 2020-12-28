@@ -106,15 +106,37 @@ func (t *Table) GetRandIntColumn() *Column {
 	return nil
 }
 
-func (t *Table) GenRandValues(cols []*Column) []string {
+func (t *Table) GetRandRow(cols []*Column) []string {
+	if len(t.values) == 0 {
+		return nil
+	}
 	if len(cols) == 0 {
-		cols = t.columns
+		return t.values[rand.Intn(len(t.values))]
 	}
-	row := make([]string, len(cols))
-	for i, c := range cols {
-		row[i] = c.RandomValue()
+	vals := make([]string, 0, len(cols))
+	randRow := t.values[rand.Intn(len(t.values))]
+	for _, targetCol := range cols {
+		for i, tableCol := range t.columns {
+			if tableCol.id == targetCol.id {
+				vals = append(vals, randRow[i])
+				break
+			}
+		}
 	}
-	return row
+	return vals
+}
+
+func (t *Table) GetRandRowVal(col *Column) string {
+	if len(t.values) == 0 {
+		return ""
+	}
+	randRow := t.values[rand.Intn(len(t.values))]
+	for i, c := range t.columns {
+		if c.id == col.id {
+			return randRow[i]
+		}
+	}
+	return "GetRandRowVal: column not found"
 }
 
 func (t *Table) cloneColumns() []*Column {

@@ -19,13 +19,13 @@ func GenNewColumn(id int) *Column {
 	switch col.tp {
 	// https://docs.pingcap.com/tidb/stable/data-type-numeric
 	case ColumnTypeFloat | ColumnTypeDouble:
-		col.arg1 = rand.Intn(256)
+		col.arg1 = 1 + rand.Intn(255)
 		upper := mathutil.Min(col.arg1, 30)
-		col.arg2 = rand.Intn(upper + 1)
+		col.arg2 = 1 + rand.Intn(upper)
 	case ColumnTypeDecimal:
-		col.arg1 = rand.Intn(66)
+		col.arg1 = 1 + rand.Intn(65)
 		upper := mathutil.Min(col.arg1, 30)
-		col.arg2 = rand.Intn(upper + 1)
+		col.arg2 = 1 + rand.Intn(upper)
 	case ColumnTypeBit:
 		col.arg1 = 1 + rand.Intn(62)
 	case ColumnTypeChar, ColumnTypeBinary:
@@ -36,6 +36,9 @@ func GenNewColumn(id int) *Column {
 		col.arg1 = 1 + rand.Intn(4294967295)
 	case ColumnTypeEnum, ColumnTypeSet:
 		col.args = []string{"Alice", "Bob", "Charlie", "David"}
+	}
+	if rand.Intn(5) == 0 {
+		col.arg1, col.arg2 = 0, 0
 	}
 	if col.tp.IsIntegerType() {
 		col.isUnsigned = RandomBool()
@@ -75,6 +78,36 @@ func GenNewIndex(id int, tbl *Table) *Index {
 		}
 	}
 	return idx
+}
+
+func (t *Table) GenRandValues(cols []*Column) []string {
+	if len(cols) == 0 {
+		cols = t.columns
+	}
+	row := make([]string, len(cols))
+	for i, c := range cols {
+		row[i] = c.RandomValue()
+	}
+	return row
+}
+
+func (c *Column) ZeroValue() string {
+	switch c.tp {
+	case ColumnTypeTinyInt, ColumnTypeSmallInt, ColumnTypeMediumInt, ColumnTypeInt, ColumnTypeBigInt, ColumnTypeBoolean:
+		return "0"
+	case ColumnTypeFloat, ColumnTypeDouble, ColumnTypeDecimal, ColumnTypeBit:
+		return "0"
+	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:
+		return "''"
+	case ColumnTypeEnum, ColumnTypeSet:
+		return fmt.Sprintf("'%s'", c.args[0])
+	case ColumnTypeDate, ColumnTypeDatetime, ColumnTypeTimestamp:
+		return fmt.Sprintf("2000-01-01")
+	case ColumnTypeTime:
+		return fmt.Sprintf("'00:00:00'")
+	default:
+		return "invalid data type"
+	}
 }
 
 func (c *Column) RandomValue() string {
@@ -117,6 +150,9 @@ func (c *Column) RandomValue() string {
 		right := rand.Intn(mathutil.Min(c.arg2, 4))
 		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
 	case ColumnTypeDecimal:
+		if c.arg1 == 0 && c.arg2 == 0 {
+			return RandomFloat(0, 10000)
+		}
 		left := rand.Intn(mathutil.Min(c.arg1-c.arg2, 6))
 		right := rand.Intn(mathutil.Min(c.arg2, 4))
 		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
