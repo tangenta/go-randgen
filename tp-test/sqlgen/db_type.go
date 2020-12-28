@@ -51,6 +51,8 @@ type ControlOption struct {
 	InitTableCount int
 	// the number of rows to initialize for each table.
 	InitRowCount int
+	// the number of columns for each tables.
+	InitColCount int
 
 	// the max number of tables.
 	MaxTableNum int
@@ -64,6 +66,7 @@ func DefaultControlOption() *ControlOption {
 		InitTableCount:   1,
 		MaxTableNum:      1,
 		InitRowCount:     10,
+		InitColCount:     5,
 		StrictTransTable: true,
 	}
 }

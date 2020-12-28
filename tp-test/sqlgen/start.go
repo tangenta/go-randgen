@@ -95,6 +95,9 @@ func NewGenerator(state *State) func() string {
 		postListener.Register("createTable", tbl.ReorderColumns)
 		definitions = NewFn("definitions", func() Fn {
 			colDefs = NewFn("colDefs", func() Fn {
+				if state.IsInitializing() {
+					return Repeat(colDef, state.ctrl.InitColCount, Str(","))
+				}
 				return Or(
 					colDef,
 					And(colDef, Str(","), colDefs).SetW(2),

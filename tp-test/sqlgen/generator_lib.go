@@ -90,19 +90,22 @@ func Or(fns ...Fn) Fn {
 	}}
 }
 
-func Repeat(fn Fn, cnt int) Fn {
+func Repeat(fn Fn, cnt int, sep Fn) Fn {
 	if cnt == 0 {
 		return Empty()
 	}
-	fns := make([]Fn, 0, cnt)
+	fns := make([]Fn, 0, 2*cnt-1)
 	for i := 0; i < cnt; i++ {
-		fns[i] = fn
+		fns = append(fns, fn)
+		if i != cnt-1 {
+			fns = append(fns, sep)
+		}
 	}
 	return And(fns...)
 }
 
-func RepeatRange(low, high int, fn Fn) Fn {
-	return Repeat(fn, low+rand.Intn(high-low))
+func RepeatRange(low, high int, fn Fn, sep Fn) Fn {
+	return Repeat(fn, low+rand.Intn(high-low), sep)
 }
 
 func Join(sep Fn, fns ...Fn) Fn {
