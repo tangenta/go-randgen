@@ -6,7 +6,9 @@ import (
 )
 
 func TestA(t *testing.T) {
-	gen := NewGenerator(NewState())
+	state := NewState()
+	state.InjectTodoSQL("set @@tidb_enable_clustered_index=true")
+	gen := NewGenerator(state)
 	for i := 0; i < 200; i++ {
 		fmt.Printf("%s;\n", gen())
 	}

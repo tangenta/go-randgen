@@ -27,6 +27,9 @@ func NewGenerator(state *State) func() string {
 	}
 
 	start = NewFn("start", func() Fn {
+		if sql, ok := state.PopOneTodoSQL(); ok {
+			return Str(sql)
+		}
 		if state.IsInitializing() {
 			return initStart
 		}

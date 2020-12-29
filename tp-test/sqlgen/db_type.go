@@ -6,6 +6,8 @@ type State struct {
 	tables     []*Table
 	scope      []map[ScopeKeyType]ScopeObj
 	finishInit bool
+
+	todoSQLs []string
 }
 
 type Table struct {

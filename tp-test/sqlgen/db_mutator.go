@@ -4,6 +4,19 @@ import (
 	"sort"
 )
 
+func (s *State) PopOneTodoSQL() (string, bool) {
+	if len(s.todoSQLs) == 0 {
+		return "", false
+	}
+	sql := s.todoSQLs[0]
+	s.todoSQLs = s.todoSQLs[1:]
+	return sql, true
+}
+
+func (s *State) InjectTodoSQL(sqls ...string) {
+	s.todoSQLs = append(s.todoSQLs, sqls...)
+}
+
 func (s *State) UpdateCtrlOption(fn func(option *ControlOption)) {
 	fn(s.ctrl)
 }
