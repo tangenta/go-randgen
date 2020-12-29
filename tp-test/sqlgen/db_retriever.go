@@ -37,20 +37,10 @@ func (t *Table) GetRandColumn() *Column {
 	return t.columns[rand.Intn(len(t.columns))]
 }
 
-func (t *Table) GetRandColumnWithIndexUncovered() *Column {
-	restCols := make([]*Column, 0, len(t.columns))
-	for _, c := range t.columns {
-		hasBeenCovered := false
-		for _, idx := range t.indices {
-			if idx.name == c.name {
-				hasBeenCovered = true
-				break
-			}
-		}
-		if !hasBeenCovered {
-			restCols = append(restCols, c)
-		}
-	}
+func (t *Table) GetRandDroppableColumn() *Column {
+	restCols := t.FilterColumns(func(c *Column) bool {
+		return c.IsDroppable()
+	})
 	return restCols[rand.Intn(len(restCols))]
 }
 
@@ -73,14 +63,13 @@ func (t *Table) GetRandColumnsIncludedDefaultValue() []*Column {
 	return selectedCols
 }
 
-func (t *Table) HasColumnUncoveredByIndex() bool {
-	indexedCols := make(map[string]struct{})
-	for _, idx := range t.indices {
-		for _, c := range idx.columns {
-			indexedCols[c.name] = struct{}{}
+func (t *Table) HasDroppableColumn() bool {
+	for _, c := range t.columns {
+		if c.IsDroppable() {
+			return true
 		}
 	}
-	return len(t.columns) != len(indexedCols)
+	return false
 }
 
 func (t *Table) FilterColumns(pred func(column *Column) bool) []*Column {
@@ -167,4 +156,8 @@ func (t *Table) GetRandColumns() []*Column {
 		}
 	}
 	return selectedCols
+}
+
+func (c *Column) IsDroppable() bool {
+	return len(c.relatedIndices) == 0
 }

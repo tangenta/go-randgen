@@ -41,6 +41,9 @@ func (t *Table) ReorderColumns() {
 }
 
 func (t *Table) AppendIndex(idx *Index) {
+	for _, idxCol := range idx.columns {
+		idxCol.relatedIndices[idx.id] = struct{}{}
+	}
 	t.indices = append(t.indices, idx)
 }
 
@@ -53,6 +56,9 @@ func (t *Table) RemoveIndex(idx *Index) {
 		}
 	}
 	t.indices = append(t.indices[:pos], t.indices[pos+1:]...)
+	for _, idxCol := range idx.columns {
+		delete(idxCol.relatedIndices, idx.id)
+	}
 }
 
 func (t *Table) AppendRow(row []string) {

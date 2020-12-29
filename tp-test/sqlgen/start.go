@@ -70,7 +70,7 @@ func NewGenerator(state *State) func() string {
 		return Or(
 			addColumn,
 			addIndex,
-			If(len(tbl.columns) > 1 && tbl.HasColumnUncoveredByIndex(),
+			If(len(tbl.columns) > 1 && tbl.HasDroppableColumn(),
 				dropColumn,
 			),
 			If(len(tbl.indices) > 0,
@@ -399,7 +399,7 @@ func NewGenerator(state *State) func() string {
 
 	dropColumn = NewFn("dropColumn", func() Fn {
 		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
-		col := tbl.GetRandColumnWithIndexUncovered()
+		col := tbl.GetRandDroppableColumn()
 		tbl.RemoveColumn(col)
 		return Strs(
 			"alter table", tbl.name,

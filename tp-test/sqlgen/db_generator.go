@@ -46,6 +46,7 @@ func GenNewColumn(id int) *Column {
 	if !col.tp.DisallowDefaultValue() && RandomBool() {
 		col.defaultVal = col.RandomValue()
 	}
+	col.relatedIndices = map[int]struct{}{}
 	return col
 }
 
@@ -59,7 +60,7 @@ func GenNewIndex(id int, tbl *Table) *Index {
 	if idx.tp == IndexTypePrimary {
 		tbl.containsPK = true
 	}
-	totalCols := tbl.columns
+	totalCols := tbl.cloneColumns()
 	for {
 		chosenIdx := rand.Intn(len(totalCols))
 		chosenCol := totalCols[chosenIdx]
@@ -151,17 +152,21 @@ func (c *Column) RandomValue() string {
 		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
 	case ColumnTypeDecimal:
 		if c.arg1 == 0 && c.arg2 == 0 {
-			return RandomFloat(0, 10000)
+			c.arg1 = 10
 		}
-		left := rand.Intn(mathutil.Min(c.arg1-c.arg2, 6))
-		right := rand.Intn(mathutil.Min(c.arg2, 4))
+		left := rand.Intn(1 + mathutil.Min(c.arg1-c.arg2, 6))
+		right := rand.Intn(1 + mathutil.Min(c.arg2, 4))
 		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
 	case ColumnTypeBit:
 		return RandomNum(0, (1<<c.arg1)-1)
 	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:
 		length := c.arg1
 		if length == 0 {
-			length = 5
+			if c.tp == ColumnTypeBinary {
+				length = 1
+			} else {
+				length = 5
+			}
 		} else if length > 20 {
 			length = 20
 		}

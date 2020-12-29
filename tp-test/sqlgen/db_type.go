@@ -27,7 +27,8 @@ type Column struct {
 	arg2       int      // optional
 	args       []string // for ColumnTypeSet and ColumnTypeEnum
 
-	defaultVal string
+	defaultVal     string
+	relatedIndices map[int]struct{}
 }
 
 type Index struct {
