@@ -182,7 +182,7 @@ func initDB(db *sqlz.DB) (err error) {
     id bigint not null auto_increment,
     test_id char(36) not null,
     seq int not null,
-    tag varchar(40) not null,
+    tag varchar(255) not null,
     errmsg text,
     result longblob,
     rows_affected int,

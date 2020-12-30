@@ -37,7 +37,7 @@ func GenNewColumn(id int) *Column {
 	case ColumnTypeEnum, ColumnTypeSet:
 		col.args = []string{"Alice", "Bob", "Charlie", "David"}
 	}
-	if rand.Intn(5) == 0 {
+	if col.tp != ColumnTypeVarchar && rand.Intn(5) == 0 {
 		col.arg1, col.arg2 = 0, 0
 	}
 	if col.tp.IsIntegerType() {
@@ -103,7 +103,7 @@ func (c *Column) ZeroValue() string {
 	case ColumnTypeEnum, ColumnTypeSet:
 		return fmt.Sprintf("'%s'", c.args[0])
 	case ColumnTypeDate, ColumnTypeDatetime, ColumnTypeTimestamp:
-		return fmt.Sprintf("2000-01-01")
+		return fmt.Sprintf("'2000-01-01'")
 	case ColumnTypeTime:
 		return fmt.Sprintf("'00:00:00'")
 	default:
@@ -159,14 +159,18 @@ func (c *Column) RandomValue() string {
 		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
 	case ColumnTypeBit:
 		return RandomNum(0, (1<<c.arg1)-1)
-	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeText, ColumnTypeBlob, ColumnTypeBinary:
+	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeBinary:
 		length := c.arg1
 		if length == 0 {
-			if c.tp == ColumnTypeBinary {
-				length = 1
-			} else {
-				length = 5
-			}
+			length = 1
+		} else if length > 20 {
+			length = 20
+		}
+		return fmt.Sprintf("'%s'", RandStringRunes(rand.Intn(length)))
+	case ColumnTypeText, ColumnTypeBlob:
+		length := c.arg1
+		if length == 0 {
+			length = 5
 		} else if length > 20 {
 			length = 20
 		}
@@ -195,6 +199,9 @@ func RandStringRunes(n int) string {
 var numRunes = []rune("0123456789")
 
 func RandNumRunes(n int) string {
+	if n == 0 {
+		return "0"
+	}
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = numRunes[rand.Intn(len(numRunes))]

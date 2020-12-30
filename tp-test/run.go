@@ -99,6 +99,23 @@ func runABTest(ctx context.Context, failed chan struct{}, opts runABTestOptions)
 		// using different db names allows us run test on same db instance
 		dbName1 := "db1__" + strings.ReplaceAll(t.ID, "-", "_")
 		dbName2 := "db2__" + strings.ReplaceAll(t.ID, "-", "_")
+		isInitialized := strings.HasSuffix(opts.Tag1, "#") && strings.HasSuffix(opts.Tag2, "#")
+		if !isInitialized {
+			if !strings.HasSuffix(opts.Tag1, "#") {
+				v1, err := selectVersion(opts.DB1)
+				if err != nil {
+					return err
+				}
+				opts.Tag1 = fmt.Sprintf("%s(%s)#", opts.Tag1, v1)
+			}
+			if !strings.HasSuffix(opts.Tag2, "#") {
+				v2, err := selectVersion(opts.DB2)
+				if err != nil {
+					return err
+				}
+				opts.Tag2 = fmt.Sprintf("%s(%s)#", opts.Tag2, v2)
+			}
+		}
 
 		conn1, err1 := initTest(ctx, opts.DB1, dbName1, t)
 		if err1 != nil {
@@ -174,6 +191,17 @@ func runABTest(ctx context.Context, failed chan struct{}, opts runABTestOptions)
 		closeConns()
 	}
 	return nil
+}
+
+func selectVersion(db *sql.DB) (string, error) {
+	var versionInfo string
+	const query = "SELECT version()"
+	row := db.QueryRow(query)
+	err := row.Scan(&versionInfo)
+	if err != nil {
+		return "", fmt.Errorf("sql: %s, err: %s", query, err.Error())
+	}
+	return versionInfo, nil
 }
 
 func initTest(ctx context.Context, db *sql.DB, name string, t *Test) (conn *sql.Conn, err error) {
