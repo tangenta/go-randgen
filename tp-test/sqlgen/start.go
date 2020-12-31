@@ -34,16 +34,17 @@ func NewGenerator(state *State) func() string {
 			return initStart
 		}
 		return Or(
-			//switchSysVars,
+			switchSysVars,
+			adminCheck,
 			If(len(state.tables) < state.ctrl.MaxTableNum,
 				createTable,
-			).SetW(3),
+			).SetW(13),
 			If(len(state.tables) > 0,
 				Or(
 					dmlStmt.SetW(4),
 					ddlStmt.SetW(1),
 				),
-			).SetW(5),
+			).SetW(15),
 		)
 	})
 
@@ -88,6 +89,18 @@ func NewGenerator(state *State) func() string {
 			Str("set @@global.tidb_row_format_version = 1"),
 			Str("set @@tidb_enable_clustered_index = 0"),
 			Str("set @@tidb_enable_clustered_index = 1"),
+		)
+	})
+
+	adminCheck = NewFn("adminCheck", func() Fn {
+		tbl := state.GetRandTable()
+		if len(tbl.indices) == 0 {
+			return Strs("admin check table", tbl.name)
+		}
+		idx := tbl.GetRandomIndex()
+		return Or(
+			Strs("admin check table", tbl.name),
+			Strs("admin check index", tbl.name, idx.name),
 		)
 	})
 
@@ -343,20 +356,34 @@ func NewGenerator(state *State) func() string {
 	predicate = NewFn("predicate", func() Fn {
 		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
 		randCol := tbl.GetRandColumn()
-		randColVals = NewFn("randColVals", func() Fn {
-			var randVal string
+		randVal = NewFn("randVal", func() Fn {
+			var v string
 			if rand.Intn(3) == 0 || len(tbl.values) == 0 {
-				randVal = randCol.RandomValue()
+				v = randCol.RandomValue()
 			} else {
-				randVal = tbl.GetRandRowVal(randCol)
+				v = tbl.GetRandRowVal(randCol)
 			}
+			return Str(v)
+		})
+		randColVals = NewFn("randColVals", func() Fn {
 			return Or(
-				Str(randVal),
-				And(Str(randVal), Str(","), randColVals).SetW(3),
+				randVal,
+				And(randVal, Str(","), randColVals).SetW(3),
+			)
+		})
+		cmpSymbol = NewFn("cmpSymbol", func() Fn {
+			return Or(
+				Str("="),
+				Str("<"),
+				Str("<="),
+				Str(">"),
+				Str(">="),
+				Str("<>"),
+				Str("!="),
 			)
 		})
 		return Or(
-			Strs(randCol.name, "=", randCol.RandomValue()),
+			And(Str(randCol.name), cmpSymbol, randVal),
 			And(Str(randCol.name), Str("in"), Str("("), randColVals, Str(")")),
 		)
 	})

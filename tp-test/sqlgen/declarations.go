@@ -34,4 +34,7 @@ var (
 	dmlStmt           Fn
 	ddlStmt           Fn
 	initStart         Fn
+	adminCheck        Fn
+	randVal           Fn
+	cmpSymbol         Fn
 )

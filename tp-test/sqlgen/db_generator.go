@@ -147,8 +147,8 @@ func (c *Column) RandomValue() string {
 		if c.arg1 == 0 && c.arg2 == 0 {
 			return RandomFloat(0, 10000)
 		}
-		left := rand.Intn(mathutil.Min(c.arg1-c.arg2, 6))
-		right := rand.Intn(mathutil.Min(c.arg2, 4))
+		left := rand.Intn(1 + mathutil.Min(c.arg1-c.arg2, 6))
+		right := rand.Intn(1 + mathutil.Min(c.arg2, 4))
 		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
 	case ColumnTypeDecimal:
 		if c.arg1 == 0 && c.arg2 == 0 {
