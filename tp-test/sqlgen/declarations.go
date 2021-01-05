@@ -37,4 +37,6 @@ var (
 	adminCheck        Fn
 	randVal           Fn
 	cmpSymbol         Fn
+	flashBackTable    Fn
+	dropTable         Fn
 )

@@ -41,8 +41,11 @@ func NewGenerator(state *State) func() string {
 			).SetW(13),
 			If(len(state.tables) > 0,
 				Or(
-					dmlStmt.SetW(4),
-					ddlStmt.SetW(1),
+					dmlStmt.SetW(12),
+					ddlStmt.SetW(3),
+					If(state.ctrl.CanReadGCSavePoint,
+						flashBackTable,
+					),
 				),
 			).SetW(15),
 		)
@@ -89,6 +92,21 @@ func NewGenerator(state *State) func() string {
 			Str("set @@global.tidb_row_format_version = 1"),
 			Str("set @@tidb_enable_clustered_index = 0"),
 			Str("set @@tidb_enable_clustered_index = 1"),
+		)
+	})
+
+	dropTable = NewFn("dropTable", func() Fn {
+		tbl := state.GetRandTable()
+		state.Store(ScopeKeyLastDropTable, NewScopeObj(tbl))
+		return Strs("drop table", tbl.name)
+	})
+
+	flashBackTable = NewFn("flashBackTable", func() Fn {
+		tbl := state.GetRandTable()
+		state.InjectTodoSQL(fmt.Sprintf("flashback table %s", tbl.name))
+		return Or(
+			Strs("drop table", tbl.name),
+			Strs("truncate table", tbl.name),
 		)
 	})
 

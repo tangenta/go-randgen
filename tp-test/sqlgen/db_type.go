@@ -63,15 +63,18 @@ type ControlOption struct {
 	// for the columns that have no default value,
 	// whether allow to omit column names in 'INSERT' statement.
 	StrictTransTable bool
+	// indicate that the testing server has gc save point.
+	CanReadGCSavePoint bool
 }
 
 func DefaultControlOption() *ControlOption {
 	return &ControlOption{
-		InitTableCount:   1,
-		MaxTableNum:      1,
-		InitRowCount:     10,
-		InitColCount:     5,
-		StrictTransTable: true,
+		InitTableCount:     1,
+		InitRowCount:       10,
+		InitColCount:       5,
+		MaxTableNum:        1,
+		StrictTransTable:   true,
+		CanReadGCSavePoint: false,
 	}
 }
 

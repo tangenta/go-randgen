@@ -120,6 +120,7 @@ const (
 	ScopeKeyCurrentTable ScopeKeyType = iota
 	ScopeKeyCurrentColumn
 	ScopeKeyCurrentIndex
+	ScopeKeyLastDropTable
 
 	ScopeKeySelectedCols
 
