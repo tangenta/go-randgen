@@ -46,6 +46,7 @@ func GenNewColumn(id int) *Column {
 	if !col.tp.DisallowDefaultValue() && RandomBool() {
 		col.defaultVal = col.RandomValue()
 	}
+	col.isNotNull = RandomBool()
 	col.relatedIndices = map[int]struct{}{}
 	return col
 }
@@ -112,6 +113,9 @@ func (c *Column) ZeroValue() string {
 }
 
 func (c *Column) RandomValue() string {
+	if rand.Intn(20) == 0 {
+		return "null"
+	}
 	if c.isUnsigned {
 		switch c.tp {
 		case ColumnTypeTinyInt:

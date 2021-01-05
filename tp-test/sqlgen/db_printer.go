@@ -61,6 +61,9 @@ func PrintColumnType(c *Column) string {
 		sb.WriteString(" default ")
 		sb.WriteString(c.defaultVal)
 	}
+	if c.isNotNull {
+		sb.WriteString(" not null")
+	}
 	return sb.String()
 }
 

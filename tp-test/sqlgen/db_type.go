@@ -30,6 +30,7 @@ type Column struct {
 	args       []string // for ColumnTypeSet and ColumnTypeEnum
 
 	defaultVal     string
+	isNotNull      bool
 	relatedIndices map[int]struct{}
 }
 
