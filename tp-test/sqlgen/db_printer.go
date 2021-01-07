@@ -1,6 +1,7 @@
 package sqlgen
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -94,4 +95,20 @@ func PrintIndexType(idx *Index) string {
 	default:
 		return "invalid"
 	}
+}
+
+func PrintFullQualifiedColName(tbl *Table, cols []*Column) string {
+	if len(cols) == 0 {
+		return fmt.Sprintf("%s.*", tbl.name)
+	}
+	var sb strings.Builder
+	for i, col := range cols {
+		sb.WriteString(tbl.name)
+		sb.WriteString(".")
+		sb.WriteString(col.name)
+		if i != len(cols)-1 {
+			sb.WriteString(", ")
+		}
+	}
+	return sb.String()
 }

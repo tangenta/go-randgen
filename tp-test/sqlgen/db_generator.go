@@ -9,8 +9,9 @@ import (
 	"github.com/cznic/mathutil"
 )
 
-func GenNewTable(name string) *Table {
-	return &Table{name: name}
+func GenNewTable(id int) *Table {
+	tblName := fmt.Sprintf("tbl_%d", id)
+	return &Table{id: id, name: tblName}
 }
 
 func GenNewColumn(id int) *Column {
@@ -113,7 +114,7 @@ func (c *Column) ZeroValue() string {
 }
 
 func (c *Column) RandomValue() string {
-	if rand.Intn(20) == 0 {
+	if !c.isNotNull && rand.Intn(20) == 0 {
 		return "null"
 	}
 	if c.isUnsigned {

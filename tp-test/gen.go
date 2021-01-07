@@ -67,7 +67,7 @@ func genTestWithoutGrammarFile(opts genTestOptions) (test Test, err error) {
 	state.InjectTodoSQL("set @@tidb_enable_clustered_index=true")
 	gen := sqlgen2.NewGenerator(state)
 	for i := 0; i < opts.NumTxn; i++ {
-		txnStmtCount := 1 + rand.Intn(10)
+		txnStmtCount := 1 + rand.Intn(200)
 		txn := make(Txn, 0, txnStmtCount)
 		for j := 0; j < txnStmtCount; j++ {
 			txn = append(txn, Stmt{Stmt: gen()})

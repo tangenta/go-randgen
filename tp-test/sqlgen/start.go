@@ -52,14 +52,11 @@ func NewGenerator(state *State) func() string {
 	})
 
 	initStart = NewFn("initStart", func() Fn {
-		return Or(
-			If(len(state.tables) < state.ctrl.InitTableCount,
-				createTable,
-			).SetW(3),
-			If(len(state.tables) > 0,
-				insertInto,
-			),
-		)
+		if len(state.tables) < state.ctrl.InitTableCount {
+			return createTable
+		} else {
+			return insertInto
+		}
 	})
 
 	dmlStmt = NewFn("dmlStmt", func() Fn {
@@ -123,8 +120,7 @@ func NewGenerator(state *State) func() string {
 	})
 
 	createTable = NewFn("createTable", func() Fn {
-		tblName := fmt.Sprintf("tbl_%d", state.AllocGlobalID(ScopeKeyTableUniqID))
-		tbl := GenNewTable(tblName)
+		tbl := GenNewTable(state.AllocGlobalID(ScopeKeyTableUniqID))
 		state.AppendTable(tbl)
 		postListener.Register("createTable", tbl.ReorderColumns)
 		definitions = NewFn("definitions", func() Fn {
@@ -168,7 +164,7 @@ func NewGenerator(state *State) func() string {
 
 		return And(
 			Str("create table"),
-			Str(tblName),
+			Str(tbl.name),
 			Str("("),
 			definitions,
 			Str(")"),
@@ -252,6 +248,9 @@ func NewGenerator(state *State) func() string {
 				Str("("), aggSelect, forUpdateOpt, Str(")"),
 				union,
 				Str("("), aggSelect, forUpdateOpt, Str(")"),
+			),
+			If(len(state.tables) > 1,
+				multiTableQuery,
 			),
 		)
 	})
@@ -389,20 +388,21 @@ func NewGenerator(state *State) func() string {
 				And(randVal, Str(","), randColVals).SetW(3),
 			)
 		})
-		cmpSymbol = NewFn("cmpSymbol", func() Fn {
-			return Or(
-				Str("="),
-				Str("<"),
-				Str("<="),
-				Str(">"),
-				Str(">="),
-				Str("<>"),
-				Str("!="),
-			)
-		})
 		return Or(
 			And(Str(randCol.name), cmpSymbol, randVal),
 			And(Str(randCol.name), Str("in"), Str("("), randColVals, Str(")")),
+		)
+	})
+
+	cmpSymbol = NewFn("cmpSymbol", func() Fn {
+		return Or(
+			Str("="),
+			Str("<"),
+			Str("<="),
+			Str(">"),
+			Str(">="),
+			Str("<>"),
+			Str("!="),
 		)
 	})
 
@@ -453,6 +453,49 @@ func NewGenerator(state *State) func() string {
 			"alter table", tbl.name,
 			"drop column", col.name,
 		)
+	})
+
+	multiTableQuery = NewFn("multiTableQuery", func() Fn {
+		tbl1 := state.GetRandTable()
+		tbl2 := state.GetRandTable()
+		cols1 := tbl1.GetRandColumns()
+		cols2 := tbl2.GetRandColumns()
+
+		group := GroupColumnsByColumnTypes(tbl1, tbl2)
+		group = FilterUniqueColumns(group)
+		joinPredicates = NewFn("joinPredicates", func() Fn {
+			return Or(
+				joinPredicate,
+				And(joinPredicate, Or(Str("and"), Str("or")), joinPredicates),
+			)
+		})
+
+		joinPredicate = NewFn("joinPredicate", func() Fn {
+			col1, col2 := RandColumnPairWithSameType(group)
+			return And(
+				Str(col1.name),
+				cmpSymbol,
+				Str(col2.name),
+			)
+		})
+
+		return And(
+			Str("select"),
+			Str(PrintFullQualifiedColName(tbl1, cols1)),
+			Str(","),
+			Str(PrintFullQualifiedColName(tbl2, cols2)),
+			Str("from"),
+			Str(tbl1.name),
+			Or(Str("left join"), Str("join"), Str("right join")),
+			Str(tbl2.name),
+			OptIf(len(group) > 0, And(Str("on"), joinPredicates)),
+		)
+	})
+
+	createTableForJoin = NewFn("createTableForJoin", func() Fn {
+		tbl := GenNewTable(state.AllocGlobalID(ScopeKeyTableUniqID))
+		state.AppendTable(tbl)
+		return Strs("create table")
 	})
 
 	return retFn

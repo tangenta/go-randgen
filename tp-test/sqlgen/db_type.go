@@ -11,6 +11,7 @@ type State struct {
 }
 
 type Table struct {
+	id      int
 	name    string
 	columns []*Column
 	indices []*Index
@@ -69,10 +70,10 @@ type ControlOption struct {
 
 func DefaultControlOption() *ControlOption {
 	return &ControlOption{
-		InitTableCount:     1,
+		InitTableCount:     5,
 		InitRowCount:       10,
 		InitColCount:       5,
-		MaxTableNum:        1,
+		MaxTableNum:        5,
 		StrictTransTable:   true,
 		CanReadGCSavePoint: false,
 	}
