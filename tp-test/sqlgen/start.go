@@ -37,7 +37,10 @@ func NewGenerator(state *State) func() string {
 			switchSysVars,
 			adminCheck,
 			If(len(state.tables) < state.ctrl.MaxTableNum,
-				createTable,
+				Or(
+					createTable.SetW(4),
+					createTableLike,
+				),
 			).SetW(13),
 			If(len(state.tables) > 0,
 				Or(
@@ -492,10 +495,17 @@ func NewGenerator(state *State) func() string {
 		)
 	})
 
-	createTableForJoin = NewFn("createTableForJoin", func() Fn {
-		tbl := GenNewTable(state.AllocGlobalID(ScopeKeyTableUniqID))
-		state.AppendTable(tbl)
-		return Strs("create table")
+	createTableLike = NewFn("createTableLike", func() Fn {
+		tbl := state.GetRandTable()
+		newTbl := tbl.CreateTableLike(func() int {
+			return state.AllocGlobalID(ScopeKeyTableUniqID)
+		}, func() int {
+			return state.AllocGlobalID(ScopeKeyColumnUniqID)
+		}, func() int {
+			return state.AllocGlobalID(ScopeKeyIndexUniqID)
+		})
+		state.AppendTable(newTbl)
+		return Strs("create table", newTbl.name, "like", tbl.name)
 	})
 
 	return retFn

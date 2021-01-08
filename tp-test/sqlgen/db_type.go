@@ -73,7 +73,7 @@ func DefaultControlOption() *ControlOption {
 		InitTableCount:     5,
 		InitRowCount:       10,
 		InitColCount:       5,
-		MaxTableNum:        5,
+		MaxTableNum:        7,
 		StrictTransTable:   true,
 		CanReadGCSavePoint: false,
 	}

@@ -1,6 +1,7 @@
 package sqlgen
 
 import (
+	"fmt"
 	"math/rand"
 )
 
@@ -134,6 +135,59 @@ func (t *Table) cloneColumns() []*Column {
 		cols[i] = c
 	}
 	return cols
+}
+
+func (t *Table) CreateTableLike(tblIDFn, colIDFn, idxIDFn func() int) *Table {
+	tblID := tblIDFn()
+	name := fmt.Sprintf("tbl_%d", tblID)
+
+	oldID2NewCol := make(map[int]*Column, len(t.columns))
+	newCols := make([]*Column, 0, len(t.columns))
+	for _, c := range t.columns {
+		colID := colIDFn()
+		colName := fmt.Sprintf("col_%d", colID)
+		newCol := &Column{
+			id:             colID,
+			name:           colName,
+			tp:             c.tp,
+			isUnsigned:     c.isUnsigned,
+			arg1:           c.arg1,
+			arg2:           c.arg2,
+			args:           c.args,
+			defaultVal:     c.defaultVal,
+			isNotNull:      c.isNotNull,
+			relatedIndices: map[int]struct{}{},
+		}
+		oldID2NewCol[c.id] = newCol
+		newCols = append(newCols, newCol)
+	}
+
+	newIdxs := make([]*Index, 0, len(t.indices))
+	for _, idx := range t.indices {
+		idxID := idxIDFn()
+		idxName := fmt.Sprintf("idx_%d", idxID)
+		newIdx := &Index{
+			id:           idxID,
+			name:         idxName,
+			tp:           idx.tp,
+			columnPrefix: idx.columnPrefix,
+		}
+		newIdx.columns = make([]*Column, 0, len(idx.columns))
+		for _, ic := range idx.columns {
+			newIdx.columns = append(newIdx.columns, oldID2NewCol[ic.id])
+			ic.relatedIndices[idxID] = struct{}{}
+		}
+		newIdxs = append(newIdxs, newIdx)
+	}
+
+	return &Table{
+		id:         tblID,
+		name:       name,
+		columns:    newCols,
+		indices:    newIdxs,
+		containsPK: t.containsPK,
+		values:     nil,
+	}
 }
 
 func (t *Table) GetRandColumns() []*Column {
