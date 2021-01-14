@@ -129,6 +129,10 @@ func (t *Table) GetRandRowVal(col *Column) string {
 	return "GetRandRowVal: column not found"
 }
 
+func (t *Table) GetHandleColumns() []*Column {
+	return t.handleCols
+}
+
 func (t *Table) cloneColumns() []*Column {
 	cols := make([]*Column, len(t.columns))
 	for i, c := range t.columns {

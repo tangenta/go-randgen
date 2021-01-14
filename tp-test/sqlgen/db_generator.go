@@ -2,7 +2,9 @@ package sqlgen
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
+	"sort"
 	"strconv"
 	"time"
 
@@ -44,10 +46,10 @@ func GenNewColumn(id int) *Column {
 	if col.tp.IsIntegerType() {
 		col.isUnsigned = RandomBool()
 	}
+	col.isNotNull = RandomBool()
 	if !col.tp.DisallowDefaultValue() && RandomBool() {
 		col.defaultVal = col.RandomValue()
 	}
-	col.isNotNull = RandomBool()
 	col.relatedIndices = map[int]struct{}{}
 	return col
 }
@@ -56,6 +58,7 @@ func GenNewIndex(id int, tbl *Table) *Index {
 	idx := &Index{id: id, name: fmt.Sprintf("idx_%d", id)}
 	maxVal := int(IndexTypeMax)
 	if tbl.containsPK {
+		// Exclude primary key type.
 		maxVal = int(IndexTypePrimary)
 	}
 	idx.tp = IndexType(rand.Intn(maxVal))
@@ -94,6 +97,22 @@ func (t *Table) GenRandValues(cols []*Column) []string {
 	return row
 }
 
+func (t *Table) GenMultipleRowsAscForHandleCols(count int) [][]string {
+	rows := make([][]string, count)
+	firstColumn := t.handleCols[0].RandomValuesAsc(count)
+	for i := 0; i < count; i++ {
+		rows[i] = make([]string, len(t.handleCols))
+		for j := 0; j < len(t.handleCols); j++ {
+			if j == 0 {
+				rows[i][j] = firstColumn[i]
+			} else {
+				rows[i][j] = t.handleCols[j].RandomValue()
+			}
+		}
+	}
+	return rows
+}
+
 func (c *Column) ZeroValue() string {
 	switch c.tp {
 	case ColumnTypeTinyInt, ColumnTypeSmallInt, ColumnTypeMediumInt, ColumnTypeInt, ColumnTypeBigInt, ColumnTypeBoolean:
@@ -114,56 +133,58 @@ func (c *Column) ZeroValue() string {
 }
 
 func (c *Column) RandomValue() string {
-	if !c.isNotNull && rand.Intn(20) == 0 {
+	if !c.isNotNull && rand.Intn(30) == 0 {
 		return "null"
+	}
+	return c.RandomValuesAsc(1)[0]
+}
+
+func (c *Column) RandomValueRange() (string, string) {
+	values := c.RandomValuesAsc(2)
+	return values[0], values[1]
+}
+
+func (c *Column) RandomValuesAsc(count int) []string {
+	if count == 0 {
+		return nil
 	}
 	if c.isUnsigned {
 		switch c.tp {
 		case ColumnTypeTinyInt:
-			return RandomNum(0, 255)
+			return RandomNums(0, 255, count)
 		case ColumnTypeSmallInt:
-			return RandomNum(0, 65535)
+			return RandomNums(0, 65535, count)
 		case ColumnTypeMediumInt:
-			return RandomNum(0, 16777215)
+			return RandomNums(0, 16777215, count)
 		case ColumnTypeInt:
-			return RandomNum(0, 4294967295)
+			return RandomNums(0, 4294967295, count)
 		case ColumnTypeBigInt:
-			return RandomNum(0, 9223372036854775806)
+			return RandomNums(0, 9223372036854775806, count)
 		}
 	}
 	switch c.tp {
 	case ColumnTypeTinyInt:
-		return RandomNum(-128, 127)
+		return RandomNums(-128, 127, count)
 	case ColumnTypeSmallInt:
-		return RandomNum(-32768, 32767)
+		return RandomNums(-32768, 32767, count)
 	case ColumnTypeMediumInt:
-		return RandomNum(-8388608, 8388607)
+		return RandomNums(-8388608, 8388607, count)
 	case ColumnTypeInt:
-		return RandomNum(-2147483648, 2147483647)
+		return RandomNums(-2147483648, 2147483647, count)
 	case ColumnTypeBigInt:
-		num := rand.Int63()
-		if RandomBool() {
-			num = -num
-		}
-		return strconv.FormatInt(num, 10)
+		return RandBigInts(count)
 	case ColumnTypeBoolean:
-		return RandomNum(0, 1)
+		return RandomNums(0, 1, count)
 	case ColumnTypeFloat, ColumnTypeDouble:
-		if c.arg1 == 0 && c.arg2 == 0 {
-			return RandomFloat(0, 10000)
-		}
-		left := rand.Intn(1 + mathutil.Min(c.arg1-c.arg2, 6))
-		right := rand.Intn(1 + mathutil.Min(c.arg2, 4))
-		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
+		return RandFloats(c.arg1, c.arg2, count)
 	case ColumnTypeDecimal:
-		if c.arg1 == 0 && c.arg2 == 0 {
-			c.arg1 = 10
+		m, d := c.arg1, c.arg2
+		if m == 0 && d == 0 {
+			m = 10
 		}
-		left := rand.Intn(1 + mathutil.Min(c.arg1-c.arg2, 6))
-		right := rand.Intn(1 + mathutil.Min(c.arg2, 4))
-		return fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right))
+		return RandFloats(m, d, count)
 	case ColumnTypeBit:
-		return RandomNum(0, (1<<c.arg1)-1)
+		return RandomNums(0, (1<<c.arg1)-1, count)
 	case ColumnTypeChar, ColumnTypeVarchar, ColumnTypeBinary:
 		length := c.arg1
 		if length == 0 {
@@ -171,7 +192,7 @@ func (c *Column) RandomValue() string {
 		} else if length > 20 {
 			length = 20
 		}
-		return fmt.Sprintf("'%s'", RandStringRunes(rand.Intn(length)))
+		return RandStrings(length, count)
 	case ColumnTypeText, ColumnTypeBlob:
 		length := c.arg1
 		if length == 0 {
@@ -179,15 +200,16 @@ func (c *Column) RandomValue() string {
 		} else if length > 20 {
 			length = 20
 		}
-		return fmt.Sprintf("'%s'", RandStringRunes(rand.Intn(length)))
+		return RandStrings(length, count)
 	case ColumnTypeEnum, ColumnTypeSet:
-		return fmt.Sprintf("'%s'", c.args[rand.Intn(len(c.args))])
+		return RandEnums(c.args, count)
 	case ColumnTypeDate, ColumnTypeDatetime, ColumnTypeTimestamp:
-		return fmt.Sprintf("'%s'", RandDate())
+		return RandDates(count)
 	case ColumnTypeTime:
-		return fmt.Sprintf("'%s'", RandTime())
+		return RandTimes(count)
 	default:
-		return "invalid data type"
+		log.Fatalf("invalid column type %v", c.tp)
+		return nil
 	}
 }
 
@@ -214,20 +236,111 @@ func RandNumRunes(n int) string {
 	return string(b)
 }
 
-func RandDate() string {
-	min := time.Date(1970, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
-	max := time.Date(2037, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
-	delta := max - min
-
-	sec := rand.Int63n(delta) + min
-	return time.Unix(sec, 0).Format("2006-01-02")
+func RandStrings(strLen int, count int) []string {
+	result := make([]string, count)
+	for i := 0; i < count; i++ {
+		result[i] = fmt.Sprintf("'%s'", RandStringRunes(rand.Intn(strLen)))
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i] < result[j]
+	})
+	return result
 }
 
-func RandTime() string {
+func RandBigInts(count int) []string {
+	nums := make([]int64, count)
+	for i := 0; i < count; i++ {
+		nums[i] = rand.Int63()
+		if RandomBool() {
+			nums[i] = -nums[i]
+		}
+	}
+	sort.Slice(nums, func(i, j int) bool {
+		return nums[i] < nums[j]
+	})
+	result := make([]string, count)
+	for i := 0; i < count; i++ {
+		result[i] = strconv.FormatInt(nums[i], 10)
+	}
+	return result
+}
+
+func RandFloats(m, d int, count int) []string {
+	nums := make([]float64, count)
+	for i := 0; i < count; i++ {
+		if m == 0 && d == 0 {
+			nums[i] = RandomFloat(0, 10000)
+			continue
+		}
+		left := rand.Intn(1 + mathutil.Min(m-d, 6))
+		right := rand.Intn(1 + mathutil.Min(d, 4))
+		nums[i], _ = strconv.ParseFloat(fmt.Sprintf("%s.%s", RandNumRunes(left), RandNumRunes(right)), 64)
+	}
+	sort.Slice(nums, func(i, j int) bool {
+		return nums[i] < nums[j]
+	})
+	result := make([]string, count)
+	for i := 0; i < count; i++ {
+		result[i] = fmt.Sprintf("%v", nums[i])
+	}
+	return result
+}
+
+func RandEnums(args []string, count int) []string {
+	nums := make([]int, count)
+	for i := 0; i < count; i++ {
+		nums[i] = rand.Intn(len(args))
+	}
+	sort.Slice(nums, func(i, j int) bool {
+		return nums[i] < nums[j]
+	})
+	result := make([]string, count)
+	for i := 0; i < count; i++ {
+		result[i] = fmt.Sprintf("'%s'", args[nums[i]])
+	}
+	return result
+}
+
+func RandDates(count int) []string {
+	return RandGoTimes(count, "2006-01-02")
+}
+
+func RandTimes(count int) []string {
+	return RandGoTimes(count, "15:04:05.00")
+}
+
+func RandGoTimes(count int, format string) []string {
 	min := time.Date(1970, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
 	max := time.Date(2037, 1, 0, 0, 0, 0, 0, time.UTC).Unix()
 	delta := max - min
 
-	sec := rand.Int63n(delta) + min
-	return time.Unix(sec, 0).Format("15:04:05.00")
+	times := make([]time.Time, count)
+	for i := 0; i < count; i++ {
+		sec := rand.Int63n(delta) + min
+		times[i] = time.Unix(sec, 0)
+	}
+	sort.Slice(times, func(i, j int) bool {
+		return times[i].Before(times[j])
+	})
+
+	result := make([]string, count)
+	for i := 0; i < count; i++ {
+		result[i] = fmt.Sprintf("'%s'", times[i].Format(format))
+	}
+	return result
+}
+
+func RandomFloats(low, high float64, count int) []string {
+	nums := make([]float64, count)
+	for i := 0; i < count; i++ {
+		nums[i] = low + rand.Float64()*(high-low)
+	}
+	sort.Slice(nums, func(i, j int) bool {
+		return nums[i] < nums[j]
+	})
+	result := make([]string, count)
+	for i := 0; i < count; i++ {
+		result[i] = fmt.Sprintf("%f", nums[i])
+	}
+	return result
 }

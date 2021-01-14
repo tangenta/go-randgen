@@ -46,6 +46,7 @@ func NewGenerator(state *State) func() string {
 				Or(
 					dmlStmt.SetW(12),
 					ddlStmt.SetW(3),
+					splitRegion.SetW(2),
 					If(state.ctrl.CanReadGCSavePoint,
 						flashBackTable,
 					),
@@ -87,12 +88,19 @@ func NewGenerator(state *State) func() string {
 	})
 
 	switchSysVars = NewFn("switchSysVars", func() Fn {
-		return Or(
-			Str("set @@global.tidb_row_format_version = 2"),
-			Str("set @@global.tidb_row_format_version = 1"),
-			Str("set @@tidb_enable_clustered_index = 0"),
-			Str("set @@tidb_enable_clustered_index = 1"),
-		)
+		if RandomBool() {
+			if RandomBool() {
+				return Str("set @@global.tidb_row_format_version = 2")
+			}
+			return Str("set @@global.tidb_row_format_version = 1")
+		} else {
+			if RandomBool() {
+				state.enabledClustered = false
+				return Str("set @@tidb_enable_clustered_index = 0")
+			}
+			state.enabledClustered = true
+			return Str("set @@tidb_enable_clustered_index = 1")
+		}
 	})
 
 	dropTable = NewFn("dropTable", func() Fn {
@@ -125,7 +133,10 @@ func NewGenerator(state *State) func() string {
 	createTable = NewFn("createTable", func() Fn {
 		tbl := GenNewTable(state.AllocGlobalID(ScopeKeyTableUniqID))
 		state.AppendTable(tbl)
-		postListener.Register("createTable", tbl.ReorderColumns)
+		postListener.Register("createTable", func() {
+			tbl.ReorderColumns()
+			tbl.SetPrimaryKeyAndHandle(state)
+		})
 		definitions = NewFn("definitions", func() Fn {
 			colDefs = NewFn("colDefs", func() Fn {
 				if state.IsInitializing() {
@@ -506,6 +517,19 @@ func NewGenerator(state *State) func() string {
 		})
 		state.AppendTable(newTbl)
 		return Strs("create table", newTbl.name, "like", tbl.name)
+	})
+
+	splitRegion = NewFn("splitRegion", func() Fn {
+		tbl := state.GetRandTable()
+		rows := tbl.GenMultipleRowsAscForHandleCols(2)
+		row1, row2 := rows[0], rows[1]
+
+		// "split table t between () and ();"
+
+		return Strs(
+			"split table", tbl.name, "between",
+			"(", PrintRandValues(row1), ")", "and",
+			"(", PrintRandValues(row2), ")", "regions", RandomNum(2, 10))
 	})
 
 	return retFn

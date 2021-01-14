@@ -14,9 +14,9 @@
 package sqlgen
 
 import (
-	"fmt"
 	"log"
 	"math/rand"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -50,9 +50,23 @@ func RandomNum(low, high int64) string {
 	return strconv.FormatInt(num+low, 10)
 }
 
-func RandomFloat(low, high float64) string {
-	f := low + rand.Float64()*(high-low)
-	return fmt.Sprintf("%f", f)
+func RandomNums(low, high int64, count int) []string {
+	nums := make([]int64, count)
+	for i := 0; i < count; i++ {
+		nums[i] = rand.Int63n(high - low + 1)
+	}
+	sort.Slice(nums, func(i, j int) bool {
+		return nums[i] < nums[j]
+	})
+	result := make([]string, count)
+	for i := 0; i < count; i++ {
+		result[i] = strconv.FormatInt(nums[i], 10)
+	}
+	return result
+}
+
+func RandomFloat(low, high float64) float64 {
+	return low + rand.Float64()*(high-low)
 }
 
 func RandomBool() bool {

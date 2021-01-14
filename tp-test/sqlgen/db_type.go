@@ -3,11 +3,12 @@ package sqlgen
 type State struct {
 	ctrl *ControlOption
 
-	tables     []*Table
-	scope      []map[ScopeKeyType]ScopeObj
-	finishInit bool
+	tables           []*Table
+	scope            []map[ScopeKeyType]ScopeObj
+	enabledClustered bool
 
-	todoSQLs []string
+	finishInit bool
+	todoSQLs   []string
 }
 
 type Table struct {
@@ -17,6 +18,7 @@ type Table struct {
 	indices []*Index
 
 	containsPK bool // to ensure at most 1 pk in each table
+	handleCols []*Column
 	values     [][]string
 }
 

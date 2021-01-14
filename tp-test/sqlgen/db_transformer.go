@@ -8,6 +8,8 @@ import (
 // ColumnTypeGroup stores column types -> columns
 type ColumnTypeGroup = map[ColumnType][]*Column
 
+// GroupColumnsByColumnTypes groups all the columns in given tables by ColumnType.
+// This can be used in ON clause in JOIN.
 func GroupColumnsByColumnTypes(tables ...*Table) ColumnTypeGroup {
 	group := make(ColumnTypeGroup)
 	for _, t := range tables {

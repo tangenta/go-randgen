@@ -43,4 +43,5 @@ var (
 	multiTableQuery   Fn
 	joinPredicates    Fn
 	joinPredicate     Fn
+	splitRegion       Fn
 )
