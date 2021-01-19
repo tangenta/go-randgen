@@ -56,14 +56,12 @@ func GenNewColumn(id int) *Column {
 
 func GenNewIndex(id int, tbl *Table) *Index {
 	idx := &Index{id: id, name: fmt.Sprintf("idx_%d", id)}
-	maxVal := int(IndexTypeMax)
 	if tbl.containsPK {
 		// Exclude primary key type.
-		maxVal = int(IndexTypePrimary)
-	}
-	idx.tp = IndexType(rand.Intn(maxVal))
-	if idx.tp == IndexTypePrimary {
+		idx.tp = IndexType(rand.Intn(int(IndexTypePrimary)))
+	} else {
 		tbl.containsPK = true
+		idx.tp = IndexTypePrimary
 	}
 	totalCols := tbl.cloneColumns()
 	for {

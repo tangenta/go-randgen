@@ -47,7 +47,8 @@ type Index struct {
 
 func NewState() *State {
 	s := &State{
-		ctrl: DefaultControlOption(),
+		ctrl:             DefaultControlOption(),
+		enabledClustered: true,
 	}
 	s.CreateScope()
 	return s

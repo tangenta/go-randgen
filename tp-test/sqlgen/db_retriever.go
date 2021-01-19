@@ -165,7 +165,6 @@ func (t *Table) CreateTableLike(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 		oldID2NewCol[c.id] = newCol
 		newCols = append(newCols, newCol)
 	}
-
 	newIdxs := make([]*Index, 0, len(t.indices))
 	for _, idx := range t.indices {
 		idxID := idxIDFn()
@@ -183,6 +182,10 @@ func (t *Table) CreateTableLike(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 		}
 		newIdxs = append(newIdxs, newIdx)
 	}
+	newHandleCols := make([]*Column, 0, len(t.handleCols))
+	for _, oldHdCol := range t.handleCols {
+		newHandleCols = append(newHandleCols, oldID2NewCol[oldHdCol.id])
+	}
 
 	return &Table{
 		id:         tblID,
@@ -190,6 +193,7 @@ func (t *Table) CreateTableLike(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 		columns:    newCols,
 		indices:    newIdxs,
 		containsPK: t.containsPK,
+		handleCols: newHandleCols,
 		values:     nil,
 	}
 }
