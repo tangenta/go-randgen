@@ -363,20 +363,23 @@ func doStmt(ctx context.Context, tx *sql.Tx, stmt Stmt) (*resultset.ResultSet, e
 }
 
 func validateErrs(err1 error, err2 error) bool {
-	if ignoreIndexCoverError(err1, err2) || ignoreSystemVariable(err1, err2) {
-		return true
+	ignoreErrMsgs := []string{
+		"with index covered now",                         // 4.0 cannot drop column with index
+		"Unknown system variable",                        // 4.0 cannot recognize tidb_enable_clustered_index
+		"Split table region lower value count should be", // 4.0 not compatible with 'split table between'
+		"for column '_tidb_rowid'",                       // 4.0 split table between may generate incorrect value.
+	}
+	for _, msg := range ignoreErrMsgs {
+		match := OneOfContains(err1, err2, msg)
+		if match {
+			return true
+		}
 	}
 	return (err1 == nil && err2 == nil) || (err1 != nil && err2 != nil)
 }
 
-func ignoreIndexCoverError(err1, err2 error) bool {
-	c1 := err1 != nil && strings.Contains(err1.Error(), "with index covered now") && err2 == nil
-	c2 := err2 != nil && strings.Contains(err2.Error(), "with index covered now") && err1 == nil
-	return c1 || c2
-}
-
-func ignoreSystemVariable(err1, err2 error) bool {
-	c1 := err1 != nil && strings.Contains(err1.Error(), "Unknown system variable") && err2 == nil
-	c2 := err2 != nil && strings.Contains(err2.Error(), "Unknown system variable") && err1 == nil
+func OneOfContains(err1, err2 error, msg string) bool {
+	c1 := err1 != nil && strings.Contains(err1.Error(), msg) && err2 == nil
+	c2 := err2 != nil && strings.Contains(err2.Error(), msg) && err1 == nil
 	return c1 || c2
 }
