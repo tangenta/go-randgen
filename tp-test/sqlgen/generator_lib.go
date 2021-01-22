@@ -53,7 +53,7 @@ func RandomNum(low, high int64) string {
 func RandomNums(low, high int64, count int) []string {
 	nums := make([]int64, count)
 	for i := 0; i < count; i++ {
-		nums[i] = rand.Int63n(high - low + 1)
+		nums[i] = low + rand.Int63n(high - low + 1)
 	}
 	sort.Slice(nums, func(i, j int) bool {
 		return nums[i] < nums[j]

@@ -492,6 +492,18 @@ func NewGenerator(state *State) func() string {
 				Str(col2.name),
 			)
 		})
+		if len(group) == 0 {
+			return And(
+				Str("select"),
+				Str(PrintFullQualifiedColName(tbl1, cols1)),
+				Str(","),
+				Str(PrintFullQualifiedColName(tbl2, cols2)),
+				Str("from"),
+				Str(tbl1.name),
+				Str("join"),
+				Str(tbl2.name),
+			)
+		}
 
 		return And(
 			Str("select"),
@@ -502,7 +514,7 @@ func NewGenerator(state *State) func() string {
 			Str(tbl1.name),
 			Or(Str("left join"), Str("join"), Str("right join")),
 			Str(tbl2.name),
-			OptIf(len(group) > 0, And(Str("on"), joinPredicates)),
+			And(Str("on"), joinPredicates),
 		)
 	})
 
