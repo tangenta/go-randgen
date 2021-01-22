@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548
+	github.com/davecgh/go-spew v1.1.1
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/google/uuid v1.1.1
 	github.com/pingcap/go-randgen v0.0.0-20200721020841-1466757857eb

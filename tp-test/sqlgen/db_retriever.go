@@ -186,6 +186,7 @@ func (t *Table) CreateTableLike(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 	for _, oldHdCol := range t.handleCols {
 		newHandleCols = append(newHandleCols, oldID2NewCol[oldHdCol.id])
 	}
+	Assert(len(newHandleCols) > 0, oldID2NewCol)
 
 	return &Table{
 		id:         tblID,

@@ -73,11 +73,7 @@ func GenNewIndex(id int, tbl *Table) *Index {
 		if chosenCol.tp.NeedKeyLength() ||
 			(chosenCol.tp.IsStringType() && rand.Intn(4) == 0) {
 			maxPrefix := mathutil.Min(chosenCol.arg1, 5)
-			if maxPrefix == 0 {
-				prefixLen = 0
-			} else {
-				prefixLen = 1 + rand.Intn(maxPrefix)
-			}
+			prefixLen = 1 + rand.Intn(maxPrefix+1)
 		}
 		idx.columnPrefix = append(idx.columnPrefix, prefixLen)
 		keySizeInBytes := 0
@@ -85,6 +81,7 @@ func GenNewIndex(id int, tbl *Table) *Index {
 			keySizeInBytes += c.EstimateSizeInBytes()
 		}
 		if keySizeInBytes > DefaultKeySize {
+			Assert(len(idx.columns) > 1, keySizeInBytes, idx.columns, "one column key size should not > 3072")
 			idx.columns = idx.columns[:len(idx.columns)-1]
 			idx.columnPrefix = idx.columnPrefix[:len(idx.columnPrefix)-1]
 			break

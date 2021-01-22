@@ -48,6 +48,7 @@ func (t *Table) RemoveColumn(c *Column) {
 
 // Only use it when there is no table data.
 func (t *Table) ReorderColumns() {
+	Assert(len(t.values) == 0, "ReorderColumns can be only used when there is no table data")
 	sort.Slice(t.columns, func(i, j int) bool {
 		return t.columns[i].id < t.columns[j].id
 	})
