@@ -32,6 +32,10 @@ func (t *Table) AppendColumn(c *Column) {
 	}
 }
 
+func (t *Table) AppendPartitionTable(c *Column) {
+	t.partitionColumns = append(t.partitionColumns, c)
+}
+
 func (t *Table) RemoveColumn(c *Column) {
 	var pos int
 	for i := range t.columns {

@@ -17,9 +17,10 @@ type Table struct {
 	columns []*Column
 	indices []*Index
 
-	containsPK bool // to ensure at most 1 pk in each table
-	handleCols []*Column
-	values     [][]string
+	containsPK       bool // to ensure at most 1 pk in each table
+	handleCols       []*Column
+	partitionColumns []*Column
+	values           [][]string
 }
 
 type Column struct {

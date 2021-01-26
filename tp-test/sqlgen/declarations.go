@@ -44,4 +44,5 @@ var (
 	joinPredicates    Fn
 	joinPredicate     Fn
 	splitRegion       Fn
+	partitionDef      Fn
 )

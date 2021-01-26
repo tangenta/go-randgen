@@ -175,6 +175,19 @@ func NewGenerator(state *State) func() string {
 				colDefs,
 			)
 		})
+		partitionDef = NewFn("partitionDef", func() Fn {
+			col := tbl.GetRandColumn()
+			tbl.AppendPartitionTable(col)
+			partitionNum := RandomNum(1, 6)
+			return And(
+				Str("partition by"),
+				Str("hash("),
+				Str(col.name),
+				Str(")"),
+				Str("partitions"),
+				Str(partitionNum),
+			)
+		})
 
 		return And(
 			Str("create table"),
@@ -182,6 +195,7 @@ func NewGenerator(state *State) func() string {
 			Str("("),
 			definitions,
 			Str(")"),
+			OptIf(rand.Intn(5) == 0, partitionDef),
 		)
 	})
 
@@ -520,7 +534,7 @@ func NewGenerator(state *State) func() string {
 
 	createTableLike = NewFn("createTableLike", func() Fn {
 		tbl := state.GetRandTable()
-		newTbl := tbl.CreateTableLike(func() int {
+		newTbl := tbl.Clone(func() int {
 			return state.AllocGlobalID(ScopeKeyTableUniqID)
 		}, func() int {
 			return state.AllocGlobalID(ScopeKeyColumnUniqID)
@@ -535,8 +549,6 @@ func NewGenerator(state *State) func() string {
 		tbl := state.GetRandTable()
 		rows := tbl.GenMultipleRowsAscForHandleCols(2)
 		row1, row2 := rows[0], rows[1]
-
-		// "split table t between () and ();"
 
 		return Strs(
 			"split table", tbl.name, "between",

@@ -141,7 +141,7 @@ func (t *Table) cloneColumns() []*Column {
 	return cols
 }
 
-func (t *Table) CreateTableLike(tblIDFn, colIDFn, idxIDFn func() int) *Table {
+func (t *Table) Clone(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 	tblID := tblIDFn()
 	name := fmt.Sprintf("tbl_%d", tblID)
 
@@ -187,15 +187,20 @@ func (t *Table) CreateTableLike(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 		newHandleCols = append(newHandleCols, oldID2NewCol[oldHdCol.id])
 	}
 	Assert(len(newHandleCols) > 0, oldID2NewCol)
+	newPartitionCols := make([]*Column, 0, len(t.partitionColumns))
+	for _, oldPartCol := range t.partitionColumns {
+		newPartitionCols = append(newPartitionCols, oldID2NewCol[oldPartCol.id])
+	}
 
 	return &Table{
-		id:         tblID,
-		name:       name,
-		columns:    newCols,
-		indices:    newIdxs,
-		containsPK: t.containsPK,
-		handleCols: newHandleCols,
-		values:     nil,
+		id:               tblID,
+		name:             name,
+		columns:          newCols,
+		indices:          newIdxs,
+		containsPK:       t.containsPK,
+		handleCols:       newHandleCols,
+		partitionColumns: newPartitionCols,
+		values:           nil,
 	}
 }
 
