@@ -7,6 +7,8 @@ type State struct {
 	scope            []map[ScopeKeyType]ScopeObj
 	enabledClustered bool
 
+	prepareStmts []*Prepare
+
 	finishInit bool
 	todoSQLs   []string
 }
@@ -21,6 +23,11 @@ type Table struct {
 	handleCols       []*Column
 	partitionColumns []*Column
 	values           [][]string
+
+	// childTables records tables that have the same structure.
+	// A table is also its childTables.
+	// This is used for SELECT OUT FILE and LOAD DATA.
+	childTables []*Table
 }
 
 type Column struct {
@@ -44,6 +51,12 @@ type Index struct {
 	tp           IndexType
 	columns      []*Column
 	columnPrefix []int
+}
+
+type Prepare struct {
+	id   int
+	name string
+	args []func() string
 }
 
 func NewState() *State {
@@ -70,16 +83,19 @@ type ControlOption struct {
 	StrictTransTable bool
 	// indicate that the testing server has gc save point.
 	CanReadGCSavePoint bool
+	// Test SELECT OUTFILE and LOAD DATA
+	EnableSelectOutFileAndLoadData bool
 }
 
 func DefaultControlOption() *ControlOption {
 	return &ControlOption{
-		InitTableCount:     5,
-		InitRowCount:       10,
-		InitColCount:       5,
-		MaxTableNum:        7,
-		StrictTransTable:   true,
-		CanReadGCSavePoint: false,
+		InitTableCount:                 5,
+		InitRowCount:                   10,
+		InitColCount:                   5,
+		MaxTableNum:                    7,
+		StrictTransTable:               true,
+		CanReadGCSavePoint:             false,
+		EnableSelectOutFileAndLoadData: false,
 	}
 }
 
@@ -115,6 +131,10 @@ func (s ScopeObj) ToColumns() []*Column {
 	return s.obj.([]*Column)
 }
 
+func (s ScopeObj) ToPrepare() *Prepare {
+	return s.obj.(*Prepare)
+}
+
 func (s *State) CreateScope() {
 	s.scope = append(s.scope, make(map[ScopeKeyType]ScopeObj))
 }
@@ -127,8 +147,20 @@ func (s *State) DestroyScope() {
 }
 
 func (s *State) Store(key ScopeKeyType, val ScopeObj) {
+	Assert(!val.IsNil(), "storing a nil object")
 	current := s.scope[len(s.scope)-1]
 	current[key] = val
+}
+
+func (s *State) StoreInParent(key ScopeKeyType, val ScopeObj) {
+	Assert(len(s.scope) > 1, "cannot StoreInParent in the root scope")
+	Assert(!val.IsNil(), "storing a nil object")
+	current := s.scope[len(s.scope)-2]
+	current[key] = val
+}
+
+func (s *State) StoreInRoot(key ScopeKeyType, val ScopeObj) {
+	s.scope[0][key] = val
 }
 
 func (s *State) Search(key ScopeKeyType) ScopeObj {
@@ -183,6 +215,7 @@ func (p *PostListener) BeforeProductionGen(fn *Fn) {}
 func (p *PostListener) AfterProductionGen(fn *Fn, result *Result) {
 	if f, ok := p.callbacks[fn.Name]; ok {
 		f()
+		delete(p.callbacks, fn.Name)
 	}
 }
 
@@ -190,4 +223,21 @@ func (p *PostListener) ProductionCancel(fn *Fn) {}
 
 func (p *PostListener) Register(fnName string, fn func()) {
 	p.callbacks[fnName] = fn
+}
+
+type DebugListener struct {
+	parentsFn      []string
+	obtainedResult []*Result
+}
+
+func (d *DebugListener) BeforeProductionGen(fn *Fn) {
+	d.parentsFn = append(d.parentsFn, fn.Name)
+}
+
+func (d *DebugListener) AfterProductionGen(fn *Fn, result *Result) {
+	d.parentsFn = d.parentsFn[:len(d.parentsFn)-1]
+	d.obtainedResult = append(d.obtainedResult, result)
+}
+
+func (d *DebugListener) ProductionCancel(fn *Fn) {
 }

@@ -95,6 +95,20 @@ func (c ColumnType) IsIntegerType() bool {
 	return false
 }
 
+func (c ColumnType) IsPartitionType() bool {
+	// A BLOB field is not allowed in partition function
+	if c.IsIntegerType() {
+		return true
+	}
+	switch c {
+	case ColumnTypeChar, ColumnTypeVarchar:
+		fallthrough
+	case ColumnTypeDate, ColumnTypeDatetime:
+		return true
+	}
+	return false
+}
+
 // BLOB/TEXT/JSON column can't have a default value.
 func (c ColumnType) DisallowDefaultValue() bool {
 	return c == ColumnTypeText || c == ColumnTypeBlob
@@ -164,13 +178,20 @@ const (
 	ScopeKeyCurrentTable ScopeKeyType = iota
 	ScopeKeyCurrentColumn
 	ScopeKeyCurrentIndex
+	ScopeKeyCurrentPrepare
 	ScopeKeyLastDropTable
+	ScopeKeyCurrentPartitionColumn
+	ScopeKeyLastOutFileTable
 
 	ScopeKeySelectedCols
 
 	ScopeKeyTableUniqID
 	ScopeKeyColumnUniqID
 	ScopeKeyIndexUniqID
+	ScopeKeyTmpFileID
+	ScopeKeyPrepareID
 )
 
 const DefaultKeySize = 3072
+
+const SelectOutFileDir = "/tmp/tidb_tp_test_outfile"

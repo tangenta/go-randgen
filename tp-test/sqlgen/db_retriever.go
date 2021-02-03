@@ -3,6 +3,7 @@ package sqlgen
 import (
 	"fmt"
 	"math/rand"
+	"os"
 )
 
 func (s *State) IsInitializing() bool {
@@ -17,6 +18,8 @@ func (s *State) IsInitializing() bool {
 			return true
 		}
 	}
+	_ = os.RemoveAll(SelectOutFileDir)
+	_ = os.Mkdir(SelectOutFileDir, 0644)
 	s.finishInit = true
 	return false
 }
@@ -34,8 +37,22 @@ func (s *State) GetFirstNonFullTable() *Table {
 	return nil
 }
 
+func (s *State) GetRandPrepare() *Prepare {
+	return s.prepareStmts[rand.Intn(len(s.prepareStmts))]
+}
+
 func (t *Table) GetRandColumn() *Column {
 	return t.columns[rand.Intn(len(t.columns))]
+}
+
+func (t *Table) GetRandColumnForPartition() *Column {
+	cols := t.FilterColumns(func(column *Column) bool {
+		return column.tp.IsPartitionType()
+	})
+	if len(cols) == 0 {
+		return nil
+	}
+	return cols[rand.Intn(len(cols))]
 }
 
 func (t *Table) GetRandDroppableColumn() *Column {
@@ -192,7 +209,7 @@ func (t *Table) Clone(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 		newPartitionCols = append(newPartitionCols, oldID2NewCol[oldPartCol.id])
 	}
 
-	return &Table{
+	newTable := &Table{
 		id:               tblID,
 		name:             name,
 		columns:          newCols,
@@ -202,6 +219,10 @@ func (t *Table) Clone(tblIDFn, colIDFn, idxIDFn func() int) *Table {
 		partitionColumns: newPartitionCols,
 		values:           nil,
 	}
+	newTable.childTables = []*Table{newTable}
+	// TODO: DROP TABLE need to remove itself from children tables.
+	t.childTables = append(t.childTables, newTable)
+	return newTable
 }
 
 func (t *Table) GetRandColumns() []*Column {
@@ -226,6 +247,18 @@ func (t *Table) GetRandColumns() []*Column {
 	return selectedCols
 }
 
+func (i *Index) IsUnique() bool {
+	return i.tp == IndexTypePrimary || i.tp == IndexTypeUnique
+}
+
 func (c *Column) IsDroppable() bool {
 	return len(c.relatedIndices) == 0
+}
+
+func (p *Prepare) UserVars() []string {
+	userVars := make([]string, len(p.args))
+	for i := 0; i < len(p.args); i++ {
+		userVars[i] = fmt.Sprintf("@i%d", i)
+	}
+	return userVars
 }

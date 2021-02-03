@@ -43,3 +43,23 @@ func FilterUniqueColumns(c ColumnTypeGroup) ColumnTypeGroup {
 	}
 	return c
 }
+
+// SwapOutParameterizedColumns substitute random columns with `?` for prepare statements.
+// It returns the substituted column in order.
+func SwapOutParameterizedColumns(cols []*Column) []*Column {
+	if len(cols) == 0 {
+		return nil
+	}
+	var result []*Column
+	for {
+		chosenIdx := rand.Intn(len(cols))
+		if cols[chosenIdx].name != "?" {
+			result = append(result, cols[chosenIdx])
+			cols[chosenIdx] = &Column{name: "?"}
+		}
+		if RandomBool() {
+			break
+		}
+	}
+	return result
+}

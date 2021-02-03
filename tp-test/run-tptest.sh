@@ -3,7 +3,6 @@
 set -euo
 
 export TPBIN='/home/tangenta/gopath/src/github.com/pingcap/go-randgen/tp-test/tp-test'
-export SCENE='/home/tangenta/gopath/src/github.com/pingcap/go-randgen/tp-test/scenarios/clustered_index.yy'
 export DSN='root:@tcp(127.0.0.1:4000)/test'
 
 $TPBIN --store $DSN clear

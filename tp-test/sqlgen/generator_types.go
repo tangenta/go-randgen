@@ -22,8 +22,10 @@ import (
 type ResultType int
 
 const (
+	// Pending indicates the result is not evaluate yet.
+	Pending ResultType = iota
 	// PlainString indicates the result is a plain string
-	PlainString ResultType = iota
+	PlainString
 	// Invalid indicates the result is invalid.
 	Invalid
 )
@@ -54,9 +56,10 @@ func StrResult(str string) Result {
 
 // Fn is a callable object.
 type Fn struct {
-	Name   string
-	F      func() Result
-	Weight int
+	Name       string
+	F          func() Result
+	Weight     int
+	EvalResult Result
 }
 
 func NewFn(name string, fn func() Fn) Fn {
@@ -77,9 +80,19 @@ func (f Fn) SetW(weight int) Fn {
 	}
 }
 
+// Evaluate the productions in order from left to right. The result will be stored into a cache.
+func PreEvalWithOrder(fns ...*Fn) {
+	for _, f := range fns {
+		if f.EvalResult.Tp == Pending {
+			f.EvalResult = evaluateFn(*f)
+		}
+	}
+}
+
 // Str is a Fn which simply returns str.
 func Str(str string) Fn {
 	return Fn{
+		Name:   "_$str_fn",
 		Weight: 1,
 		F: func() Result {
 			return StrResult(str)
@@ -107,6 +120,7 @@ func Strf(str string, fns ...Fn) Fn {
 
 func Strs(strs ...string) Fn {
 	return Fn{
+		Name:   "_$str_fn",
 		Weight: 1,
 		F: func() Result {
 			return StrResult(strings.Join(strs, " "))
@@ -120,10 +134,15 @@ func Empty() Fn {
 }
 
 var innerEmptyFn = Fn{
+	Name:   "_$empty_fn",
 	Weight: 1,
 	F: func() Result {
 		return Result{Tp: PlainString, Value: ""}
 	},
+}
+
+func IsEmptyFn(fn Fn) bool {
+	return fn.Name == "_$empty_fn"
 }
 
 func NoneFn() Fn {

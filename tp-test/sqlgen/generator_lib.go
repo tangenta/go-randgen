@@ -33,7 +33,7 @@ type ProductionListener interface {
 }
 
 func And(fn ...Fn) Fn {
-	return Fn{Weight: 1, F: func() Result {
+	return Fn{Name: "_$and_fn", Weight: 1, F: func() Result {
 		return collectResult(fn...)
 	}}
 }
@@ -89,7 +89,7 @@ func OptIf(condition bool, fn Fn) Fn {
 
 func Or(fns ...Fn) Fn {
 	fns = filterNoneFns(fns)
-	return Fn{Weight: 1, F: func() Result {
+	return Fn{Name: "_$or_fn", Weight: 1, F: func() Result {
 		for len(fns) > 0 {
 			randNum := randomSelectByFactor(fns)
 			chosenFn := fns[randNum]
@@ -171,6 +171,9 @@ func collectResult(fns ...Fn) Result {
 }
 
 func evaluateFn(fn Fn) Result {
+	if fn.EvalResult.Tp != Pending {
+		return fn.EvalResult
+	}
 	if len(fn.Name) == 0 {
 		rs := fn.F()
 		return rs

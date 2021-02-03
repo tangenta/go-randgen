@@ -25,6 +25,21 @@ func (s *State) AppendTable(tbl *Table) {
 	s.tables = append(s.tables, tbl)
 }
 
+func (s *State) AppendPrepare(pre *Prepare) {
+	s.prepareStmts = append(s.prepareStmts, pre)
+}
+
+func (s *State) RemovePrepare(p *Prepare) {
+	var pos int
+	for i := range s.prepareStmts {
+		if s.prepareStmts[i].id == p.id {
+			pos = i
+			break
+		}
+	}
+	s.prepareStmts = append(s.prepareStmts[:pos], s.prepareStmts[pos+1:]...)
+}
+
 func (t *Table) AppendColumn(c *Column) {
 	t.columns = append(t.columns, c)
 	for i := range t.values {
@@ -32,7 +47,7 @@ func (t *Table) AppendColumn(c *Column) {
 	}
 }
 
-func (t *Table) AppendPartitionTable(c *Column) {
+func (t *Table) AppendPartitionColumn(c *Column) {
 	t.partitionColumns = append(t.partitionColumns, c)
 }
 
@@ -105,4 +120,36 @@ func (t *Table) RemoveIndex(idx *Index) {
 
 func (t *Table) AppendRow(row []string) {
 	t.values = append(t.values, row)
+}
+
+func (i *Index) AppendColumnIfNotExists(cols ...*Column) {
+	for _, c := range cols {
+		found := false
+		for _, idxCol := range i.columns {
+			if idxCol.id == c.id {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		i.columns = append(i.columns, c)
+		i.columnPrefix = append(i.columnPrefix, 0)
+		c.relatedIndices[i.id] = struct{}{}
+	}
+}
+
+func (p *Prepare) AppendColumns(cols []*Column) {
+	for _, c := range cols {
+		p.args = append(p.args, func() string {
+			return c.RandomValue()
+		})
+	}
+}
+
+func (p *Prepare) AppendOneColumn(col *Column) {
+	p.args = append(p.args, func() string {
+		return col.RandomValue()
+	})
 }

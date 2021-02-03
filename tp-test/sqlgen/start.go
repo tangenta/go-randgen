@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -12,6 +14,7 @@ func NewGenerator(state *State) func() string {
 	GenPlugins = append(GenPlugins, &ScopeListener{state: state})
 	postListener := &PostListener{callbacks: map[string]func(){}}
 	GenPlugins = append(GenPlugins, postListener)
+	GenPlugins = append(GenPlugins, &DebugListener{})
 	retFn := func() string {
 		res := evaluateFn(start)
 		switch res.Tp {
@@ -44,12 +47,25 @@ func NewGenerator(state *State) func() string {
 			).SetW(13),
 			If(len(state.tables) > 0,
 				Or(
-					dmlStmt.SetW(12),
-					ddlStmt.SetW(3),
+					dmlStmt.SetW(20),
+					ddlStmt.SetW(5),
 					splitRegion.SetW(2),
+					commonAnalyze.SetW(2),
+					prepareStmt.SetW(2),
+					If(len(state.prepareStmts) > 0,
+						deallocPrepareStmt,
+					).SetW(1),
 					If(state.ctrl.CanReadGCSavePoint,
 						flashBackTable,
-					),
+					).SetW(1),
+					If(state.ctrl.EnableSelectOutFileAndLoadData,
+						Or(
+							selectIntoOutFile.SetW(1),
+							If(!state.Search(ScopeKeyLastOutFileTable).IsNil(),
+								loadTable,
+							),
+						),
+					).SetW(1),
 				),
 			).SetW(15),
 		)
@@ -66,6 +82,9 @@ func NewGenerator(state *State) func() string {
 	dmlStmt = NewFn("dmlStmt", func() Fn {
 		return Or(
 			query,
+			If(len(state.prepareStmts) > 0,
+				queryPrepare,
+			),
 			commonDelete,
 			commonInsert,
 			commonUpdate,
@@ -137,29 +156,32 @@ func NewGenerator(state *State) func() string {
 			tbl.ReorderColumns()
 			tbl.SetPrimaryKeyAndHandle(state)
 		})
-		definitions = NewFn("definitions", func() Fn {
-			colDefs = NewFn("colDefs", func() Fn {
-				if state.IsInitializing() {
-					return Repeat(colDef, state.ctrl.InitColCount, Str(","))
-				}
-				return Or(
-					colDef,
-					And(colDef, Str(","), colDefs).SetW(2),
-				)
-			})
+		colDefs = NewFn("colDefs", func() Fn {
 			colDef = NewFn("colDef", func() Fn {
 				col := GenNewColumn(state.AllocGlobalID(ScopeKeyColumnUniqID))
 				tbl.AppendColumn(col)
 				return And(Str(col.name), Str(PrintColumnType(col)))
 			})
-			idxDefs = NewFn("idxDefs", func() Fn {
-				return Or(
-					idxDef,
-					And(idxDef, Str(","), idxDefs).SetW(2),
-				)
-			})
+			if state.IsInitializing() {
+				return Repeat(colDef, state.ctrl.InitColCount, Str(","))
+			}
+			return Or(
+				colDef,
+				And(colDef, Str(","), colDefs).SetW(2),
+			)
+		})
+		idxDefs = NewFn("idxDefs", func() Fn {
 			idxDef = NewFn("idxDef", func() Fn {
 				idx := GenNewIndex(state.AllocGlobalID(ScopeKeyIndexUniqID), tbl)
+				if idx.IsUnique() {
+					partitionedCol := state.Search(ScopeKeyCurrentPartitionColumn)
+					if !partitionedCol.IsNil() {
+						// all partitioned columns should be contained in every unique/primary index.
+						c := partitionedCol.ToColumn()
+						Assert(c != nil)
+						idx.AppendColumnIfNotExists(c)
+					}
+				}
 				tbl.AppendIndex(idx)
 				return And(
 					Str(PrintIndexType(idx)),
@@ -171,31 +193,45 @@ func NewGenerator(state *State) func() string {
 				)
 			})
 			return Or(
-				And(colDefs, Str(","), idxDefs).SetW(4),
-				colDefs,
+				idxDef.SetW(1),
+				And(idxDef, Str(","), idxDefs).SetW(2),
 			)
 		})
+
 		partitionDef = NewFn("partitionDef", func() Fn {
-			col := tbl.GetRandColumn()
-			tbl.AppendPartitionTable(col)
+			if rand.Intn(5) != 0 {
+				return Empty()
+			}
+			partitionedCol := tbl.GetRandColumnForPartition()
+			if partitionedCol == nil {
+				return Empty()
+			}
+			state.StoreInParent(ScopeKeyCurrentPartitionColumn, NewScopeObj(partitionedCol))
+			tbl.AppendPartitionColumn(partitionedCol)
 			partitionNum := RandomNum(1, 6)
 			return And(
 				Str("partition by"),
 				Str("hash("),
-				Str(col.name),
+				Str(partitionedCol.name),
 				Str(")"),
 				Str("partitions"),
 				Str(partitionNum),
 			)
 		})
-
+		PreEvalWithOrder(&colDefs, &partitionDef, &idxDefs)
 		return And(
 			Str("create table"),
 			Str(tbl.name),
 			Str("("),
-			definitions,
+			colDefs,
+			OptIf(rand.Intn(10) != 0,
+				And(
+					Str(","),
+					idxDefs,
+				),
+			),
 			Str(")"),
-			OptIf(rand.Intn(5) == 0, partitionDef),
+			partitionDef,
 		)
 	})
 
@@ -217,6 +253,12 @@ func NewGenerator(state *State) func() string {
 		tbl := state.GetRandTable()
 		state.Store(ScopeKeyCurrentTable, NewScopeObj(tbl))
 		cols := tbl.GetRandColumns()
+
+		prepare := state.Search(ScopeKeyCurrentPrepare)
+		if !prepare.IsNil() {
+			paramCols := SwapOutParameterizedColumns(cols)
+			prepare.ToPrepare().AppendColumns(paramCols)
+		}
 		commonSelect = NewFn("commonSelect", func() Fn {
 			return And(Str("select"),
 				Str(PrintColumnNamesWithoutPar(cols, "*")),
@@ -367,6 +409,11 @@ func NewGenerator(state *State) func() string {
 		)
 	})
 
+	commonAnalyze = NewFn("commonAnalyze", func() Fn {
+		tbl := state.GetRandTable()
+		return And(Str("analyze table"), Str(tbl.name))
+	})
+
 	commonDelete = NewFn("commonDelete", func() Fn {
 		tbl := state.GetRandTable()
 		col := tbl.GetRandColumn()
@@ -402,6 +449,11 @@ func NewGenerator(state *State) func() string {
 		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
 		randCol := tbl.GetRandColumn()
 		randVal = NewFn("randVal", func() Fn {
+			prepare := state.Search(ScopeKeyCurrentPrepare)
+			if !prepare.IsNil() && rand.Intn(5) == 0 {
+				prepare.ToPrepare().AppendOneColumn(randCol)
+				return Str("?")
+			}
 			var v string
 			if rand.Intn(3) == 0 || len(tbl.values) == 0 {
 				v = randCol.RandomValue()
@@ -545,6 +597,21 @@ func NewGenerator(state *State) func() string {
 		return Strs("create table", newTbl.name, "like", tbl.name)
 	})
 
+	selectIntoOutFile = NewFn("selectIntoOutFile", func() Fn {
+		tbl := state.GetRandTable()
+		state.StoreInRoot(ScopeKeyLastOutFileTable, NewScopeObj(tbl))
+		tmpFile := path.Join(SelectOutFileDir, fmt.Sprintf("%s_%d.txt", tbl.name, state.AllocGlobalID(ScopeKeyTmpFileID)))
+		return Strs("select * from", tbl.name, "into outfile", fmt.Sprintf("'%s'", tmpFile))
+	})
+
+	loadTable = NewFn("loadTable", func() Fn {
+		tbl := state.Search(ScopeKeyLastOutFileTable).ToTable()
+		id := state.Search(ScopeKeyTmpFileID).ToInt()
+		tmpFile := path.Join(SelectOutFileDir, fmt.Sprintf("%s_%d.txt", tbl.name, id))
+		randChildTable := tbl.childTables[rand.Intn(len(tbl.childTables))]
+		return Strs("load data local infile", fmt.Sprintf("'%s'", tmpFile), "into table", randChildTable.name)
+	})
+
 	splitRegion = NewFn("splitRegion", func() Fn {
 		tbl := state.GetRandTable()
 		rows := tbl.GenMultipleRowsAscForHandleCols(2)
@@ -556,5 +623,39 @@ func NewGenerator(state *State) func() string {
 			"(", PrintRandValues(row2), ")", "regions", RandomNum(2, 10))
 	})
 
+	prepareStmt = NewFn("prepareStmt", func() Fn {
+		prepare := GenNewPrepare(state.AllocGlobalID(ScopeKeyPrepareID))
+		state.AppendPrepare(prepare)
+		state.Store(ScopeKeyCurrentPrepare, NewScopeObj(prepare))
+		return And(
+			Str("prepare"),
+			Str(prepare.name),
+			Str("from"),
+			Str(`"`),
+			query,
+			Str(`"`))
+	})
+
+	deallocPrepareStmt = NewFn("deallocPrepareStmt", func() Fn {
+		Assert(len(state.prepareStmts) > 0, state)
+		prepare := state.GetRandPrepare()
+		state.RemovePrepare(prepare)
+		return Strs("deallocate prepare", prepare.name)
+	})
+
+	queryPrepare = NewFn("queryPrepare", func() Fn {
+		Assert(len(state.prepareStmts) > 0, state)
+		prepare := state.GetRandPrepare()
+		assignments := prepare.GenAssignments()
+		if len(assignments) == 0 {
+			return Str(fmt.Sprintf("execute %s", prepare.name))
+		}
+		for i := 1; i < len(assignments); i++ {
+			state.InjectTodoSQL(assignments[i])
+		}
+		userVarsStr := strings.Join(prepare.UserVars(), ",")
+		state.InjectTodoSQL(fmt.Sprintf("execute %s using %s", prepare.name, userVarsStr))
+		return Str(assignments[0])
+	})
 	return retFn
 }

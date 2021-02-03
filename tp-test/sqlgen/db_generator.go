@@ -13,7 +13,9 @@ import (
 
 func GenNewTable(id int) *Table {
 	tblName := fmt.Sprintf("tbl_%d", id)
-	return &Table{id: id, name: tblName}
+	newTbl := &Table{id: id, name: tblName}
+	newTbl.childTables = []*Table{newTbl}
+	return newTbl
 }
 
 func GenNewColumn(id int) *Column {
@@ -93,6 +95,14 @@ func GenNewIndex(id int, tbl *Table) *Index {
 	return idx
 }
 
+func GenNewPrepare(id int) *Prepare {
+	return &Prepare{
+		id:   id,
+		name: fmt.Sprintf("prepare_%d", id),
+		args: nil,
+	}
+}
+
 func (t *Table) GenRandValues(cols []*Column) []string {
 	if len(cols) == 0 {
 		cols = t.columns
@@ -118,6 +128,14 @@ func (t *Table) GenMultipleRowsAscForHandleCols(count int) [][]string {
 		}
 	}
 	return rows
+}
+
+func (p *Prepare) GenAssignments() []string {
+	todoSQLs := make([]string, len(p.args))
+	for i := 0; i < len(todoSQLs); i++ {
+		todoSQLs[i] = fmt.Sprintf("set @i%d = %s", i, p.args[i]())
+	}
+	return todoSQLs
 }
 
 func (c *Column) ZeroValue() string {
