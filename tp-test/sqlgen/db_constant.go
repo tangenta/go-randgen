@@ -102,8 +102,6 @@ func (c ColumnType) IsPartitionType() bool {
 	}
 	switch c {
 	case ColumnTypeChar, ColumnTypeVarchar:
-		fallthrough
-	case ColumnTypeDate, ColumnTypeDatetime:
 		return true
 	}
 	return false

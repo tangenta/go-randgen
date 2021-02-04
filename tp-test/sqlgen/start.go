@@ -49,8 +49,8 @@ func NewGenerator(state *State) func() string {
 				Or(
 					dmlStmt.SetW(20),
 					ddlStmt.SetW(5),
-					splitRegion.SetW(2),
-					commonAnalyze.SetW(2),
+					//splitRegion.SetW(2),
+					//commonAnalyze.SetW(2),
 					prepareStmt.SetW(2),
 					If(len(state.prepareStmts) > 0,
 						deallocPrepareStmt,
@@ -85,9 +85,9 @@ func NewGenerator(state *State) func() string {
 			If(len(state.prepareStmts) > 0,
 				queryPrepare,
 			),
-			commonDelete,
-			commonInsert,
-			commonUpdate,
+			//commonDelete,
+			//commonInsert,
+			//commonUpdate,
 		)
 	})
 
@@ -254,12 +254,12 @@ func NewGenerator(state *State) func() string {
 		state.Store(ScopeKeyCurrentTable, NewScopeObj(tbl))
 		cols := tbl.GetRandColumns()
 
-		prepare := state.Search(ScopeKeyCurrentPrepare)
-		if !prepare.IsNil() {
-			paramCols := SwapOutParameterizedColumns(cols)
-			prepare.ToPrepare().AppendColumns(paramCols)
-		}
 		commonSelect = NewFn("commonSelect", func() Fn {
+			prepare := state.Search(ScopeKeyCurrentPrepare)
+			if !prepare.IsNil() {
+				paramCols := SwapOutParameterizedColumns(cols)
+				prepare.ToPrepare().AppendColumns(paramCols...)
+			}
 			return And(Str("select"),
 				Str(PrintColumnNamesWithoutPar(cols, "*")),
 				Str("from"),
@@ -449,13 +449,12 @@ func NewGenerator(state *State) func() string {
 		tbl := state.Search(ScopeKeyCurrentTable).ToTable()
 		randCol := tbl.GetRandColumn()
 		randVal = NewFn("randVal", func() Fn {
+			var v string
 			prepare := state.Search(ScopeKeyCurrentPrepare)
 			if !prepare.IsNil() && rand.Intn(5) == 0 {
-				prepare.ToPrepare().AppendOneColumn(randCol)
-				return Str("?")
-			}
-			var v string
-			if rand.Intn(3) == 0 || len(tbl.values) == 0 {
+				prepare.ToPrepare().AppendColumns(randCol)
+				v = "?"
+			} else if rand.Intn(3) == 0 || len(tbl.values) == 0 {
 				v = randCol.RandomValue()
 			} else {
 				v = tbl.GetRandRowVal(randCol)

@@ -140,16 +140,10 @@ func (i *Index) AppendColumnIfNotExists(cols ...*Column) {
 	}
 }
 
-func (p *Prepare) AppendColumns(cols []*Column) {
+func (p *Prepare) AppendColumns(cols ...*Column) {
 	for _, c := range cols {
 		p.args = append(p.args, func() string {
 			return c.RandomValue()
 		})
 	}
-}
-
-func (p *Prepare) AppendOneColumn(col *Column) {
-	p.args = append(p.args, func() string {
-		return col.RandomValue()
-	})
 }
