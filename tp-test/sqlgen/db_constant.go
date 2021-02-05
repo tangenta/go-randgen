@@ -96,15 +96,9 @@ func (c ColumnType) IsIntegerType() bool {
 }
 
 func (c ColumnType) IsPartitionType() bool {
-	// A BLOB field is not allowed in partition function
-	if c.IsIntegerType() {
-		return true
-	}
-	switch c {
-	case ColumnTypeChar, ColumnTypeVarchar:
-		return true
-	}
-	return false
+	// A partitioning key must be either an integer column or
+	// an expression that resolves to an integer.
+	return c.IsIntegerType()
 }
 
 // BLOB/TEXT/JSON column can't have a default value.
